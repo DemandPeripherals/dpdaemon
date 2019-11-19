@@ -217,25 +217,25 @@ static void get_values(
         else if (v0 == 0)
             pctx->pot0 = 0;
         else
-            pctx->pot0 = (int)(v0 * 0.257);
+            pctx->pot0 = (int)(v0 * 2.57);
         if (v1 == 100.0)
             pctx->pot1 = 257;
         else if (v1 == 0)
             pctx->pot1 = 0;
         else
-            pctx->pot1 = (int)(v1 * 0.257);
+            pctx->pot1 = (int)(v1 * 2.57);
         if (v2 == 100.0)
             pctx->pot2 = 257;
         else if (v2 == 0)
             pctx->pot2 = 0;
         else
-            pctx->pot2 = (int)(v2 * 0.257);
+            pctx->pot2 = (int)(v2 * 2.57);
         if (v3 == 100.0)
             pctx->pot3 = 257;
         else if (v3 == 0)
             pctx->pot3 = 0;
         else
-            pctx->pot3 = (int)(v3 * 0.257);
+            pctx->pot3 = (int)(v3 * 2.57);
 
         txret = send_spi(pctx);
 
