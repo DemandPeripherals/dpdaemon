@@ -196,7 +196,7 @@ static void packet_hdlr(
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == (1 + pctx->nbxfer)))
+            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == pctx->nbxfer))
           ||     ( // write response packet for config
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) ) {
