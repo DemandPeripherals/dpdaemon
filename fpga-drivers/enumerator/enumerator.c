@@ -127,8 +127,6 @@ typedef enum
 #define RSC_COPYRIGHT      2
         // What we are is a ...
 #define PLUGIN_NAME        "enumerator"
-        // Default serial port
-#define DEFDEV             "/dev/ttyUSB0"
 
 #define MX_MSGLEN 1000
 
@@ -156,7 +154,7 @@ typedef struct
 
 
 /**************************************************************
- *  - Function prototypes
+ *  - Function prototypes and externs
  **************************************************************/
 static void receivePkt(int fd, void *priv, int rw);
 static void process_pkt(SLOT *, DP_PKT *, int);
@@ -175,6 +173,8 @@ extern int  useStderr;
 extern int  DebugMode;
 extern int  ForegroundMode;
 extern int  Verbosity;
+extern char *SerialPort;
+extern char *CoreFile;
 
 
 /**************************************************************
@@ -187,6 +187,8 @@ int Initialize(
     ENUM    *pctx;     // our local port context
     int      i;        // generic loop counter
     int      ret;      // generic return value
+    int      fdcore;   // FD to the DPCore file if loaded
+    char     c;        // single byte to send from file to FPGA
 
     // Allocate memory for this driver
     pctx = (ENUM *) malloc(sizeof(ENUM));
@@ -199,7 +201,7 @@ int Initialize(
     // Init our ENUM structure
     pctx->pslot = pslot;       // this instance of serial_fpga
     pctx->usbFd = -1;           // port is not yet open
-    (void) strncpy(pctx->port, DEFDEV, PATH_MAX);
+    (void) strncpy(pctx->port, SerialPort, PATH_MAX);
 
     // Register name and private data
     pslot->name = PLUGIN_NAME;
@@ -243,10 +245,30 @@ int Initialize(
     pctx->core[0].soname    = "enumerator.so";
     pctx->core[0].pcb       = process_pkt;
 
-    // now open and register the default port
+    // now open and register the serial port to the FPGA
     ret = portsetup(pctx);
     if (ret < 0) {
         return(0);           // unable to open the port
+    }
+
+    // If a DPCore.bin file is specified, load it now
+    if (CoreFile) {
+        fdcore = open(CoreFile, O_RDONLY, 0);
+        if (fdcore < 0) {
+            edlog(M_NOCORE, CoreFile, strerror(errno));
+            return(0);       // FPGA download failed
+        }
+        // "Cat" the file down the serial port
+        while (1) {
+            ret = read(fdcore, &c, 1);
+            if (ret == 1) {
+                (void) write(pctx->usbFd, &c, 1);
+                continue;
+            }
+            // no characters to get.  Done.
+            close(fdcore);
+            break;
+        }
     }
 
     // add a timer to delay the completion of the init.  This

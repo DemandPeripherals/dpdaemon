@@ -41,8 +41,10 @@
  *  -p, --listen_port      Listen for incoming UI connections on this port
  *  -r, --realtime         Try to run with real-time extensions.
  *  -V, --version          Print version number and exit.
- *  -s, --slot             Load .so file for slot specified, as slotID:file.1.
+ *  -o, --overload         Overload peripheral in slot with specified .so file (as slotID:file.1)
  *  -h, --help             Print usage message
+ *  -l, --load             Load DPCore.bin specified
+ *  -s, --serial           Use serial port specified, not the default
  *
  */
 
@@ -66,6 +68,7 @@
 /***************************************************************************
  *  - Limits and defines
  ***************************************************************************/
+#define DPCOREFILE "/usr/local/lib/db/DPCore.bin"
 
 
 /***************************************************************************
@@ -95,6 +98,8 @@ int      UiaddrAny = 0; // Use any IP address if set
 int      UiPort = DEF_UIPORT; // TCP port for ui connections
 int      ForegroundMode = 0; // run in foreground
 int      RealtimeMode = 0; // use realtime extension
+char    *SerialPort = DEFFPGAPORT;
+char    *CoreFile = (char *) 0;
 
 
 /***************************************************************************
@@ -102,7 +107,7 @@ int      RealtimeMode = 0; // use realtime extension
  ***************************************************************************/
 char    *CmdName;      // How this program was invoked
 const char *versionStr = "dpdaemon Version 0.9.0, Copyright 2019 by Demand Peripherals, Inc.";
-const char *usageStr = "usage: dpdaemon [-ev[level]dfrVmsh]\n";
+const char *usageStr = "usage: dpdaemon [-ev[level]dfrVmol[fpgabinfile]s[serialport]h]\n";
 const char *helpText = "\
 dpdaemon [options] \n\
  options:\n\
@@ -116,8 +121,10 @@ dpdaemon [options] \n\
  -p, --listen_port       Listen for incoming UI connections on this TCP port\n\
  -r, --realtime          Try to run with real-time extensions.\n\
  -V, --version           Print version number and exit.\n\
- -s, --slot              Load .so.X file for slot specified, as slotID:file.so\n\
+ -o, --overload          Load .so.X file for slot specified, as slotID:file.so\n\
  -h, --help              Print usage message.\n\
+ -s, --serialport        Use serial port specified not default port.\n\
+ -l, --load              Load DPCore.bin specified.\n\
 ";
 
 
@@ -239,11 +246,13 @@ void processcmdline(int argc, char *argv[])
         {"version", 0, 0, 'V'},
         {"listen_any", 0, 0, 'a'},
         {"listen_port", 1, 0, 'p'},
-        {"slot", 1, 0, 's'},
+        {"overload", 1, 0, 'o'},
         {"help", 0, 0, 'h'},
+        {"load", 1, 0, 'l'},
+        {"serialport", 1, 0, 's'},
         {0, 0, 0, 0}
     };
-    static char optStr[] = "ev:dfrVs:p:ah";
+    static char optStr[] = "ev:dfrVs:p:ahl:s:";
 
     while (1) {
         c = getopt_long(argc, argv, optStr, longoptions, &optidx);
@@ -282,12 +291,20 @@ void processcmdline(int argc, char *argv[])
                 RealtimeMode = 1;
                 break;
 
+            case 's':
+                SerialPort = optarg;
+                break;
+
+            case 'l':
+                CoreFile = optarg;
+                break;
+
             case 'V':
                 printf("%s\n", versionStr);
                 exit(-1);
                 break;
 
-            case 's':
+            case 'o':
                 add_so(optarg);
                 break;
 

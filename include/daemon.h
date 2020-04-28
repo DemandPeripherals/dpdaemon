@@ -65,6 +65,9 @@
 #define ED_VERB_INFO     2     /* give normal progress output */
 #define ED_VERB_TRACE    3     /* trace internal processing */
 
+        // Default serial port to the FPGA
+#define DEFFPGAPORT      "/dev/ttyUSB0"
+
 
 /***************************************************************************
  *  - Data structures  (please see design.txt for more explanation)
@@ -213,6 +216,7 @@ void prompt(
 #define M_NONULL      "/dev/null open failed with error: %s"
 #define M_NOOPEN      "open of %s failed with error: %s"
 #define M_NOPORT      "open failed on port %s"
+#define M_NOCORE      "open failed on FPGA binary file %s"
 #define M_NOREAD      "read error on: %s"
 #define M_NOREDIR     "cannot redirect %s to /dev/null"
 #define M_NOSID       "setsid failed with error: %s"
