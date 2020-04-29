@@ -28,3 +28,6 @@ to the DP AVR peripheral (see the Demand Peripherals wiki for more details):
       to the AVR USART0 (using the Tx/Rx signals) which can be seen using an 
       external terminal emulation application.
 
+
+You should install the AVR tool chain to build these samples.  Something like:
+    sudo apt-get install gcc-avr avr-libc binutils-avr
