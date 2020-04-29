@@ -373,6 +373,11 @@ static int portsetup(ENUM *pctx)
 
     // add callback for received characters
     add_fd(pctx->usbFd, ED_READ, receivePkt, (void *) pctx);
+
+    // The above may reset the FPGA.  Let's give it a chance
+    // to complete the reset.
+    sleep(1);
+
     return(pctx->usbFd);
 }
 
