@@ -17,18 +17,14 @@ Changing this causes the old device to be closed and
 the new one opened.  The default value of 'device' is
 /dev/ttyUSB0.
 
-license : the text of the license for the FPGA image.
-
-copyright : the text of the copyright of the FPGA image.
+text : full text of the FPGA build ROM
 
 
 EXAMPLES
-Use ttyS2 at 9600 baud.  Use GPIO pin 14 for interrupts
-from the FPGA.  Start monitoring data from the FPGA and
-send the command sequence b0 00 12 34 56.
+Use USB1 for the serial interface to the FPGA, and
+show the contents of the FPGA ROM.
 
  dpset enumerator port /dev/ttyUSB1
- dpget enumerator license
- dpget enumerator copyright
+ dpget enumerator text
 
 

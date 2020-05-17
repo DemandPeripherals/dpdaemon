@@ -4,13 +4,11 @@
  *  Description: Interface to a Demand Peripherals FPGA card
  *
  *  Resources:
- *    port      -  full path to serial port (/dev/ttyUSB0)
- *    license   -  License for the FPGA image
- *    copyright -  Copyright of the FPGA image
+ *    text      -  full text of the enumerator data in the FPGA image
  */
 
 /*
- * Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2020 by Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or
@@ -42,14 +40,14 @@
  *  doing any 8-bit write to register 0.
  *
  *    The information in the enumerator is broken into strings of
- *  text with the following meaning assigned to each string:
+ *  ASCII text with the following meaning assigned to each string:
  *
  *    String 1:     Copyright
- *    String 2:     Licensee email address
- *    String 3:     Build date
- *    String 4:     (unused)
- *    String 5:     (unused)
- *    String 6:     (unused)
+ *    String 2:     Customer (usually an email address)
+ *    String 3:     License # if commercial
+ *    String 4:     Product name
+ *    String 5:     Verification that the customer accepted the license
+ *    String 6:     Date the enumerator file was generated
  *    String 7:     (unused)
  *    String 8:     (unused)
  *    String 9:     enumerator
@@ -71,7 +69,7 @@
  *  peripherals are always assigned to core zero and one
  *  respectively.
  *
- *  Registers:
+ *  FPGA Registers:
  *    0: Enumeration text   - read only FIFO
  *    0: Address counter reset - write any value
  */
@@ -106,6 +104,9 @@
 #define ENUM_REG_RESET       0x00
         // Maximum number of bytes in the enumerator ROM
 #define EROM_SZ              2048
+        // Number of user visible lines in the ROM
+#define EROM_LNS             24
+
 typedef enum
 {
     STATE_TIMER,       // Waiting for init delay timer to expire
@@ -120,11 +121,9 @@ typedef enum
 
         // resource names and numbers
 #define FN_PORT            "port"
-#define FN_LICENSE         "license"
-#define FN_COPYRIGHT       "copyright"
+#define FN_TEXT            "text"
 #define RSC_PORT           0
-#define RSC_LICENSE        1
-#define RSC_COPYRIGHT      2
+#define RSC_TEXT           1
         // What we are is a ...
 #define PLUGIN_NAME        "enumerator"
 
@@ -146,8 +145,6 @@ typedef struct
     int      slix;             // where in slrx the next byte goes
     int      romIdx;           // current read location in rom
     char     rom[EROM_SZ];     // copy of ROM contents on the FPGA
-    char    *license;          // license string
-    char    *copyright;        // copyright string
     CORE     core[NUM_CORE];
 } ENUM;
 
@@ -156,23 +153,23 @@ typedef struct
 /**************************************************************
  *  - Function prototypes and externs
  **************************************************************/
-static void receivePkt(int fd, void *priv, int rw);
-static void process_pkt(SLOT *, DP_PKT *, int);
-static int  getSoNames(ENUM *);
-static void usercmd(int, int, char*, SLOT*, int, int*, char*);
-static int  portsetup(ENUM *pctx);
-static void InitStep2(void *, void *);
-static int  dptoslip(unsigned char *, int, unsigned char *);
-static void dispatch_packet(ENUM *pEnum, unsigned char *inbuf, int len);
-static void initCore(CORE *pcore);
-extern int  dpi_tx_pkt(CORE *pcore, DP_PKT *inpkt, int len);
-extern int  add_so(char *);
-extern void initslot(SLOT *);
-extern SLOT Slots[];
-extern int  useStderr;
-extern int  DebugMode;
-extern int  ForegroundMode;
-extern int  Verbosity;
+static void  receivePkt(int fd, void *priv, int rw);
+static void  process_pkt(SLOT *, DP_PKT *, int);
+static int   getSoNames(ENUM *);
+static void  usercmd(int, int, char*, SLOT*, int, int*, char*);
+static int   portsetup(ENUM *pctx);
+static void  InitStep2(void *, void *);
+static int   dptoslip(unsigned char *, int, unsigned char *);
+static void  dispatch_packet(ENUM *pEnum, unsigned char *inbuf, int len);
+static void  initCore(CORE *pcore);
+extern int   dpi_tx_pkt(CORE *pcore, DP_PKT *inpkt, int len);
+extern int   add_so(char *);
+extern void  initslot(SLOT *);
+extern SLOT  Slots[];
+extern int   useStderr;
+extern int   DebugMode;
+extern int   ForegroundMode;
+extern int   Verbosity;
 extern char *SerialPort;
 extern char *CoreFile;
 
@@ -206,7 +203,7 @@ int Initialize(
     // Register name and private data
     pslot->name = PLUGIN_NAME;
     pslot->priv = pctx;
-    pslot->desc = "Demand Peripherals FPGA Interface";
+    pslot->desc = "FPGA Interface and ROM contents";
     pslot->help = README;
 
     // Add handlers for the user visible resources
@@ -216,18 +213,12 @@ int Initialize(
     pslot->rsc[RSC_PORT].bkey = 0;
     pslot->rsc[RSC_PORT].pgscb = usercmd;
     pslot->rsc[RSC_PORT].uilock = -1;
-    pslot->rsc[RSC_LICENSE].name = FN_LICENSE;
-    pslot->rsc[RSC_LICENSE].flags = IS_READABLE;
-    pslot->rsc[RSC_LICENSE].bkey = 0;
-    pslot->rsc[RSC_LICENSE].pgscb = usercmd;
-    pslot->rsc[RSC_LICENSE].uilock = -1;
-    pslot->rsc[RSC_LICENSE].slot = pslot;
-    pslot->rsc[RSC_COPYRIGHT].name = FN_COPYRIGHT;
-    pslot->rsc[RSC_COPYRIGHT].flags = IS_READABLE;
-    pslot->rsc[RSC_COPYRIGHT].bkey = 0;
-    pslot->rsc[RSC_COPYRIGHT].pgscb = usercmd;
-    pslot->rsc[RSC_COPYRIGHT].uilock = -1;
-    pslot->rsc[RSC_COPYRIGHT].slot = pslot;
+    pslot->rsc[RSC_TEXT].name = FN_TEXT   ;
+    pslot->rsc[RSC_TEXT].flags = IS_READABLE;
+    pslot->rsc[RSC_TEXT].bkey = 0;
+    pslot->rsc[RSC_TEXT].pgscb = usercmd;
+    pslot->rsc[RSC_TEXT].uilock = -1;
+    pslot->rsc[RSC_TEXT].slot = pslot;
 
     pctx->ptimr = (void *) 0;
 
@@ -293,6 +284,9 @@ static void usercmd(
 {
     ENUM    *pctx;     // serial_fpga private info
     int      ret;      // generic call return value.  Reused.
+    char     etxt[EROM_SZ];  // ROM as text to sent to ui
+    int      i;        // index into rom[] and etxt[]
+    int      l;        // counts lines int etxt
 
     // Get this instance of the driver
     pctx = (ENUM *) pslot->priv;
@@ -300,14 +294,6 @@ static void usercmd(
 
     if ((cmd == EDGET) && (rscid == RSC_PORT)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->port);
-        *plen = ret;  // (errors are handled in calling routine)
-    }
-    else if ((cmd == EDGET) && (rscid == RSC_LICENSE)) {
-        ret = snprintf(buf, *plen, "%s\n", pctx->license);
-        *plen = ret;  // (errors are handled in calling routine)
-    }
-    if ((cmd == EDGET) && (rscid == RSC_COPYRIGHT)) {
-        ret = snprintf(buf, *plen, "%s\n", pctx->copyright);
         *plen = ret;  // (errors are handled in calling routine)
     }
     else if ((cmd == EDSET) && (rscid == RSC_PORT)) {
@@ -331,6 +317,29 @@ static void usercmd(
 
         // add a timer kick off the reading of the ROM
         pctx->ptimr = add_timer(ED_ONESHOT, 10, InitStep2, (void *) pctx);
+    }
+    else if ((cmd == EDGET) && (rscid == RSC_TEXT)) {
+        i = 0;         // index into rom/etxt
+        l = 0;         // line count
+        while (i < EROM_SZ) {
+            if (pctx->rom[i] != (char) 0) {
+                etxt[i] = pctx->rom[i];    // copy character from ROM
+            }
+            else {
+                etxt[i] = '\n';
+                l++;
+            }
+            i++;        // point to next character in ROM
+            // Done with all lines?
+            if (l >= EROM_LNS) {
+                break;
+            }
+        }
+        // The etxt buffer has all the lines from the ROM with \n added.
+        // Send to user, then return.
+        send_ui(etxt, i, cn);
+        prompt(cn);
+        *plen = 0;    // nothing else to send back
     }
 
     return;
@@ -514,10 +523,6 @@ static int getSoNames(
 
     // skip over first 9 strings to get to slot 1 driver name
     for (i = 0; i < 9; i++) {
-        if (i == 0)
-            pEnum->copyright = pc;
-        else if (i == 1)
-            pEnum->license = pc;
         while (*pc++) {
             if (pc == pend) {
                 // Oops, we've scanned past the end of the ROM
