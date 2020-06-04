@@ -226,7 +226,7 @@ int Initialize(
     pctx = (DC2DEV *) malloc(sizeof(DC2DEV));
     if (pctx == (DC2DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in dc2 initialization");
+        dplog("memory allocation failure in dc2 initialization");
         return (-1);
     }
 
@@ -307,7 +307,7 @@ static void packet_hdlr(
 
     // There are no other packets from the dc2 FPGA code so if we
     // get here there is a problem.  Log the error.
-    edlog("invalid dc2 packet from board to host");
+    dplog("invalid dc2 packet from board to host");
 
     return;
 }
@@ -317,7 +317,7 @@ static void packet_hdlr(
  * userpwmfreq():  - The user is reading or setting the PWM frequency.
  **************************************************************/
 static void userpwmfreq(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -331,12 +331,12 @@ static void userpwmfreq(
 
     pctx = (DC2DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%d\n", pctx->pwmFreq);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         // read PWM frequency from user
         ret = sscanf(val, "%d", &newfreq);
         if (ret != 1) {
@@ -402,7 +402,7 @@ static void userpwmfreq(
  * timeout.
  **************************************************************/
 static void userwatchdog(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -416,12 +416,12 @@ static void userwatchdog(
 
     pctx = (DC2DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%d\n", (100 * pctx->dog_time));
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%d", &newdog);
         if ((ret != 1) || (newdog < 0) || (newdog > 1500) ||
             (newdog % 100 != 0)) {
@@ -441,7 +441,7 @@ static void userwatchdog(
  * usermode():  - The user is reading or setting a motor's mode
  **************************************************************/
 static void usermode(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -456,7 +456,7 @@ static void usermode(
     pctx = (DC2DEV *) pslot->priv;
     pMot = (rscid == RSC_MODE0) ? &(pctx->ch0) : &(pctx->ch1);
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         // write mode character to the user
         if (pMot->mode == MODE_FORWARD) {
             strcpy(buf, "f\n");
@@ -481,7 +481,7 @@ static void usermode(
         }
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         switch (tolower(val[0])) {
             case 'f' :
                 pMot->mode = MODE_FORWARD;
@@ -513,7 +513,7 @@ static void usermode(
  * userpower():  - The user is reading or setting a motor's power
  **************************************************************/
 static void userpower(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -530,13 +530,13 @@ static void userpower(
     pctx = (DC2DEV *) pslot->priv;
     pMot = (rscid == RSC_POWER0) ? &(pctx->ch0) : &(pctx->ch1);
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret =  snprintf(buf, MAX_LINE_LEN, "%d.%d\n",
                pMot->power/10, pMot->power % 10);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         // read an unsigned decimal value from the user
         if (sscanf(val, "%u.%u", &units, &tenths) != 2) {
             if (sscanf(val, "%u", &units) != 1) {
@@ -624,7 +624,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -639,7 +639,7 @@ static void noAck(
     DC2DEV    *pctx)    // Send pin values of this dc2 to the FPGA
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

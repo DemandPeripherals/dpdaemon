@@ -99,7 +99,7 @@ int Initialize(
     pctx = (IN4DEV *) malloc(sizeof(IN4DEV));
     if (pctx == (IN4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in in4 initialization");
+        dplog("memory allocation failure in in4 initialization");
         return (-1);
     }
 
@@ -189,7 +189,7 @@ static void packet_hdlr(
 
     // Sanity check: error if none of the above
     if ((pkt->reg != IN4_REG_DATA) || (pkt->count != 1)) {
-        edlog("invalid in4 packet from board to host");
+        dplog("invalid in4 packet from board to host");
     }
 
     return;
@@ -203,7 +203,7 @@ static void packet_hdlr(
  * the reply.
  **************************************************************/
 static void userinputs(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -218,7 +218,7 @@ static void userinputs(
     int      txret;    // send status
 
     // nothing to do if invoked to set up a dpcat
-    if (cmd == EDCAT) {
+    if (cmd == DPCAT) {
         // Nothing to send back to the user
         *plen = 0;
         return;
@@ -243,7 +243,7 @@ static void userinputs(
 
     // Start timer to look for a read response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     // lock this resource to the UI session cn
     pslot->rsc[RSC_INPUTS].uilock = (char) cn;
@@ -261,7 +261,7 @@ static void userinputs(
  * write it into the supplied buffer.
  **************************************************************/
 static void userinterrupt(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -277,7 +277,7 @@ static void userinterrupt(
 
     pctx = (IN4DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%1x\n", pctx->intrr);
         *plen = ret;  // (errors are handled in calling routine)
         return;
@@ -332,7 +332,7 @@ int tofpga(
 
     // Start timer to look for a write response.
     if ((txret ==0) && (pctx->ptimer == 0)) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
 
     return(txret);
@@ -348,7 +348,7 @@ static void noAck(
     IN4DEV *pctx)    // No response from this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

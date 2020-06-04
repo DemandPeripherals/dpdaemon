@@ -116,7 +116,7 @@ int Initialize(
     pctx = (QPOTDEV *) malloc(sizeof(QPOTDEV));
     if (pctx == (QPOTDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in espi initialization");
+        dplog("memory allocation failure in espi initialization");
         return (-1);
     }
 
@@ -167,7 +167,7 @@ static void packet_hdlr(
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 9)))) {
-        edlog("invalid qpot4 packet from board to host");
+        dplog("invalid qpot4 packet from board to host");
         return;
     }
 
@@ -186,7 +186,7 @@ static void packet_hdlr(
  * On dpget, return current configuration to UI.
  **************************************************************/
 static void get_values(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -202,7 +202,7 @@ static void get_values(
     RSC *prsc = &(pslot->rsc[RSC_VALUE]);
     QPOTDEV *pctx = pslot->priv;
 
-    if (cmd == EDSET) {
+    if (cmd == DPSET) {
         if ((sscanf(val, "%f %f %f %f\n", &v0, &v1, &v2, &v3) != 4)
            || (v0 < 0.0) || (v0 > 100.0)
            || (v1 < 0.0) || (v1 > 100.0)
@@ -305,7 +305,7 @@ static int send_spi(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return txret;
 }
@@ -320,7 +320,7 @@ static void noAck(
     QPOTDEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

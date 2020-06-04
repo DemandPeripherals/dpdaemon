@@ -121,7 +121,7 @@ int Initialize(
     pctx = (QUAD2DEV *) malloc(sizeof(QUAD2DEV));
     if (pctx == (QUAD2DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in quad2 initialization");
+        dplog("memory allocation failure in quad2 initialization");
         return (-1);
     }
 
@@ -197,7 +197,7 @@ static void packet_hdlr(
     // the counters should come in since we don't ever read the period
     // (four 16 bit numbers takes _8_ bytes.)
     if ((pkt->reg != QUAD2_REG_COUNT0) || (pkt->count != 8)) {
-        edlog("invalid quad2 packet from board to host");
+        dplog("invalid quad2 packet from board to host");
         return;
     }
 
@@ -252,7 +252,7 @@ static void packet_hdlr(
  * userperiod():  - The user is reading or setting the sample period
  **************************************************************/
 static void userperiod(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -266,13 +266,13 @@ static void userperiod(
 
     pctx = (QUAD2DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         // 0=10ms, 1=20ms, ...5=60ms, 7=off(shown as 0ms)
         ret = snprintf(buf, *plen, "%d\n", ((pctx->period + 1) % 8) * 10);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%d", &newperiod);
         if ((ret != 1) || (newperiod < 0) || (newperiod > 60)) {
             ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -328,7 +328,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -343,7 +343,7 @@ static void noAck(
     QUAD2DEV *pctx)    // Send pin values of this quad2 to the FPGA
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

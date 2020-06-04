@@ -60,11 +60,11 @@ of them before you proceed with the rest of the document.
   it gives itself a name.  Commands can use either the name or the
   slot number to specify a plug-in.
 - resource - A plug-in parameter that is made visible using the
-  edget, edset, and edcat commands.  Resources can be read-only,
+  dpget, dpset, and dpcat commands.  Resources can be read-only,
   write-only, read-write, and broadcast.  Read-only is often
   associated with a status, read-write with a configuration, and
   broadcast with stream of sensor data.
-- monitor - The use of edcat to continuously read broadcast data
+- monitor - The use of dpcat to continuously read broadcast data
   as it is made available.
 - core - An FPGA based peripherals that is given a slot.  Cores
   are numbered from 0 (the enumerator) up the number of peripherals
@@ -86,13 +86,13 @@ the same with 'plug-in' being more technically correct and
 'driver' easier for a user to understand.)
    Without a lot of explanation, here again is the syntax of
 the five command available in the UI.
-  edloadso <plug-in.so>
-  edget <name|ID#> <resource_name>
-  edset <name|ID#> <resource_name> <value>
-  edcat <name|ID#> <resource_name>
-  edlist [name|ID#] 
+  dploadso <plug-in.so>
+  dpget <name|ID#> <resource_name>
+  dpset <name|ID#> <resource_name> <value>
+  dpcat <name|ID#> <resource_name>
+  dplist [name|ID#] 
 
-The edcat command is permanent in that the only way to stop the
+The dpcat command is permanent in that the only way to stop the
 feed of input data from the broadcast resource is to close the
 TCP connection to the daemon.
    The above commands are the protocol used over the TCP link,
@@ -101,17 +101,17 @@ One nice thing about the programs is that their syntax is identical
 to that of the above protocol.  For example you can telnet to
 localhost port 8870 and enter
 the following:
-   edset motors dir 50
-Or you can run the edset command from your PC command prompt: 
-   edset motors dir 50
+   dpset motors dir 50
+Or you can run the dpset command from your PC command prompt: 
+   dpset motors dir 50
 The only real difference between the TCP protocol and the Linux
 commands is that you specify a port number on the Linux commands.
 
 
 
 BUILD NOTES
-    While you can use the commands edset, edget, edcat, edlist,
-and edloadso as is, you may find that your application needs
+    While you can use the commands dpset, dpget, dpcat, dplist,
+and dploadso as is, you may find that your application needs
 would be better served if you could rename then commands to
 better match your application.  You can easy override the 'dp'
 part of the commands with a string of your choosing.  For example,
@@ -129,7 +129,7 @@ Alternatively you could use
 
 
 PROGRAM DESIGN
-   Below is a description of the design of the empty daemon from
+   Below is a description of the design of the dp daemon from
 the perspective of important data structures, program start, and
 code layout.
 
@@ -150,7 +150,7 @@ SLOT data structure has the following fields:
 - void    *priv;           // Pointer to plug-in's private data
 - RSC      rsc[NUM_RSC];   // Resources visible on this slot
    There are a few fields in SLOT worth mentioning.  The soname comes
-from either the command line (-s option) or a edloadso command.
+from either the command line (-s option) or a dploadso command.
    After dpdaemon loads the soname driver file it uses dlsym() to
 look up the location of the "Initialize" function which it then calls.
 Part of each plug-in's initialization sequence is to malloc a data
@@ -200,7 +200,7 @@ close the connection to turn off the stream of sensor or input
 data.  If the bkey field is non-zero then the connection is locked
 in a sensor cat or bidirectional channel.  The bkey field is
 encoded with the slot and ID of the resource that is locked in an
-edcat session.
+dpcat session.
 
    A core is an FPGA based peripheral.  Core are numbered from 0
 to the number of cores (NUM_CORE).  Each core is given a slot for
@@ -229,7 +229,7 @@ that you should understand before working on the code.
 sent to more than one UI TCP connection.  This allows, for example,
 a quadrature decoder to be an input to both the speed control and
 navigation programs even if they are completely separate tasks.  The
-edcat command has the slot and resource to monitor.  These two values
+dpcat command has the slot and resource to monitor.  These two values
 (slot/rsc) are combined into an integer value called bkey.  The value
 is copied to the resource structure and to the UI structure.  When
 data comes into the resource the plug-in will look at the bkey to see 

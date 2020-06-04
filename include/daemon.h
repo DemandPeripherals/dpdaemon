@@ -29,20 +29,20 @@
  ***************************************************************************/
         // Types of resources.  Broadcast and is_writable are mutually exclusive
 #define CAN_BROADCAST    1
-#define IS_READABLE      2      /* can we issue a edget to it? */
-#define IS_WRITABLE      4      /* can we issue a edset to it? */
+#define IS_READABLE      2      /* can we issue a dpget to it? */
+#define IS_WRITABLE      4      /* can we issue a dpset to it? */
 
         // Types of UI access */
-#define EDGET            1
-#define EDSET            2
-#define EDCAT            3
-#define EDLIST           4
-#define EDLOAD           5
+#define DPGET            1
+#define DPSET            2
+#define DPCAT            3
+#define DPLIST           4
+#define DPLOAD           5
 
         // Different ways to register a fd for select
-#define ED_READ          1
-#define ED_WRITE         2
-#define ED_EXCEPT        4
+#define DP_READ          1
+#define DP_WRITE         2
+#define DP_EXCEPT        4
 
         // Max size of a line from the UI's
 #define MXCMD     (2000)
@@ -50,9 +50,9 @@
 #define MXRPLY    (1000)
 
         // Timer types for use in add_timer()
-#define ED_UNUSED        0
-#define ED_ONESHOT       1
-#define ED_PERIODIC      2
+#define DP_UNUSED        0
+#define DP_ONESHOT       1
+#define DP_PERIODIC      2
 
         // Sizes of the slot array and number of resources per slot
 #define MX_PLUGIN       25     /* maximum # plug-ins per daemon */
@@ -60,10 +60,10 @@
 #define MX_SONAME      200     /* maximum # of chars in plug-in file name */
 
         // Verbosity levels
-#define ED_VERB_OFF      0     /* no verbose output at all */
-#define ED_VERB_WARN     1     /* give errors and warnings */
-#define ED_VERB_INFO     2     /* give normal progress output */
-#define ED_VERB_TRACE    3     /* trace internal processing */
+#define DP_VERB_OFF      0     /* no verbose output at all */
+#define DP_VERB_WARN     1     /* give errors and warnings */
+#define DP_VERB_INFO     2     /* give normal progress output */
+#define DP_VERB_TRACE    3     /* trace internal processing */
 
         // Default serial port to the FPGA
 #define DEFFPGAPORT      "/dev/ttyUSB0"
@@ -111,7 +111,7 @@ const SLOT * getslotbyid(
  ***************************************************************************/
 void add_fd(
     int      fd,        // FD to add
-    int      stype,     // OR of ED_READ, ED_WRITE, ED_EXCEPT
+    int      stype,     // OR of DP_READ, DP_WRITE, DP_EXCEPT
     void     (*scb) (), // select callback
     void    *pcb_data); // callback data 
 
@@ -123,9 +123,9 @@ void del_fd(
 
 
 /***************************************************************************
- *  edlog():  Print an error message on stderr or to syslog
+ *  dplog():  Print an error message on stderr or to syslog
  ***************************************************************************/
-void edlog(
+void dplog(
     char *format, ...);   // printf format string
 
 

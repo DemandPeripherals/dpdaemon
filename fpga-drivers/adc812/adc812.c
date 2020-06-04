@@ -130,7 +130,7 @@ int Initialize(
     pctx = (ADC812DEV *) malloc(sizeof(ADC812DEV));
     if (pctx == (ADC812DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in adc812 initialization");
+        dplog("memory allocation failure in adc812 initialization");
         return (-1);
     }
 
@@ -198,7 +198,7 @@ static void packet_hdlr(
     // the samples should come in since we don't ever read the period
     // or single/differential registers.
     if ((pkt->reg != ADC812_REG_ADC0) || (pkt->count != 16)) {
-        edlog("invalid adc812 packet from board to host");
+        dplog("invalid adc812 packet from board to host");
         return;
     }
 
@@ -228,7 +228,7 @@ static void packet_hdlr(
  * userconfig():  - The user is reading or setting the configuration.
  **************************************************************/
 static void userconfig(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -243,12 +243,12 @@ static void userconfig(
 
     pctx = (ADC812DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%d 0x%02x\n", pctx->period, pctx->differ);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%d %x", &newperiod, &newdiffer);
         if ((ret != 2) || (newperiod < 10) || (newperiod > 256)) {
             ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -304,7 +304,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -319,7 +319,7 @@ static void noAck(
     ADC812DEV *pctx)    // this peripheral's context
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

@@ -4,9 +4,9 @@
  *  Description: Sample driver for a non-fpga peripheral
  *
  *  Resources:
- *    messagetext - the text of the message to broadcast (edget, edset)
- *    message - broadcast resource to hear message every period seconds (edcat)
- *    period  - update interval in seconds (edget, edset)
+ *    messagetext - the text of the message to broadcast (dpget, dpset)
+ *    message - broadcast resource to hear message every period seconds (dpcat)
+ *    period  - update interval in seconds (dpget, dpset)
  */
 
 /*
@@ -84,7 +84,7 @@ int Initialize(
     pctx = (HELLODEMO *) malloc(sizeof(HELLODEMO));
     if (pctx == (HELLODEMO *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in hellodemo initialization");
+        dplog("memory allocation failure in hellodemo initialization");
         return (-1);
     }
 
@@ -119,7 +119,7 @@ int Initialize(
     pslot->rsc[RSC_MESSAGE].slot = pslot;
 
     // Start the timer to send the message text
-    pctx->ptimer = add_timer(ED_PERIODIC, (pctx->period * 1000), sendnow, (void *) pctx);
+    pctx->ptimer = add_timer(DP_PERIODIC, (pctx->period * 1000), sendnow, (void *) pctx);
 
     return (0);
 }
@@ -132,7 +132,7 @@ int Initialize(
  * for each resource if you wish.)
  **************************************************************/
 void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -146,15 +146,15 @@ void usercmd(
 
     pctx = (HELLODEMO *) pslot->priv;
 
-    if ((cmd == EDGET) && (rscid == RSC_PERIOD)) {
+    if ((cmd == DPGET) && (rscid == RSC_PERIOD)) {
         ret = snprintf(buf, *plen, "%d\n", pctx->period);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_TEXT)) {
+    else if ((cmd == DPGET) && (rscid == RSC_TEXT)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->text);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDSET) && (rscid == RSC_PERIOD)) {
+    else if ((cmd == DPSET) && (rscid == RSC_PERIOD)) {
         ret = sscanf(val, "%d", &nperiod);
         if ((ret != 1) || (nperiod < 1)) {  // one value greater than 0
             ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -165,9 +165,9 @@ void usercmd(
 
         // Delete old timer and create a new one with the new period
         del_timer(pctx->ptimer);
-        pctx->ptimer = add_timer(ED_PERIODIC, (pctx->period * 1000), sendnow, (void *) pctx);
+        pctx->ptimer = add_timer(DP_PERIODIC, (pctx->period * 1000), sendnow, (void *) pctx);
     }
-    else if ((cmd == EDSET) && (rscid == RSC_TEXT)) {
+    else if ((cmd == DPSET) && (rscid == RSC_TEXT)) {
         // Val has the new message.  Just copy it.
         // Strings longer than MX_MSGLEN are silently truncated
         (void) strncpy(pctx->text, val, MX_MSGLEN);

@@ -126,7 +126,7 @@ int Initialize(
     pctx = (COUNT4DEV *) malloc(sizeof(COUNT4DEV));
     if (pctx == (COUNT4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in count4 initialization");
+        dplog("memory allocation failure in count4 initialization");
         return (-1);
     }
 
@@ -202,7 +202,7 @@ static void packet_hdlr(
     // the counters should come in since we don't ever read the rate
     // (eight 16 bit numbers takes _32_ bytes.)
     if ((pkt->reg != COUNT4_REG_COUNT0) || (pkt->count != 16)) {
-        edlog("invalid count4 packet from board to host");
+        dplog("invalid count4 packet from board to host");
         return;
     }
 
@@ -249,7 +249,7 @@ static void packet_hdlr(
  * userparm():  - The user is reading or setting a configuration param
  **************************************************************/
 static void userparm(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -266,12 +266,12 @@ static void userparm(
     pctx = (COUNT4DEV *) pslot->priv;
 
     if (rscid == RSC_RATE) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%d\n", (pctx->rate +1) * 10);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%d", &newrate);
             if ((ret != 1) || (newrate > 80) || (newrate < 10)) {
                 ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -283,14 +283,14 @@ static void userparm(
         }
     }
     if (rscid == RSC_EDGES) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ed = pctx->edges;
             ret = snprintf(buf, *plen, "%d %d %d %d\n", (ed & 0x03), ((ed % 0x0c) >> 2),
                            ((ed % 0x30) >> 4), ((ed % 0xc0) >> 6));
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             pctx->edges = 0xff;
             ret = sscanf(val, "%d %d %d %d", &e1, &e2, &e3, &e4);
             if ((ret != 4) ||
@@ -349,7 +349,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -364,7 +364,7 @@ static void noAck(
     COUNT4DEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

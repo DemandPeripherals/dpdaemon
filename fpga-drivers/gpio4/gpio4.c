@@ -126,7 +126,7 @@ int Initialize(
     pctx = (GPIO4DEV *) malloc(sizeof(GPIO4DEV));
     if (pctx == (GPIO4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in gpio4 initialization");
+        dplog("memory allocation failure in gpio4 initialization");
         return (-1);
     }
 
@@ -202,7 +202,7 @@ static void packet_hdlr(
     // the pins should come in since we don't ever read the direction
     // or interrupt registers.
     if ((pkt->reg != GPIO4_REG_PINS) || (pkt->count != 1)) {
-        edlog("invalid gpio4 packet from board to host");
+        dplog("invalid gpio4 packet from board to host");
         return;
     }
 
@@ -239,7 +239,7 @@ static void packet_hdlr(
  * value and write it into the supplied buffer.
  **************************************************************/
 static void userpins(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -257,7 +257,7 @@ static void userpins(
     pctx = (GPIO4DEV *) pslot->priv;
     pmycore = pslot->pcore;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         // create a read packet to get the current value of the pins
         pkt.cmd = DP_CMD_OP_READ | DP_CMD_NOAUTOINC;
         pkt.core = pmycore->core_id;
@@ -272,13 +272,13 @@ static void userpins(
         }
         // Start timer to look for a read response.
         if (pctx->ptimer == 0)
-            pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
         // lock this resource to the UI session cn
         pslot->rsc[RSC_PINS].uilock = (char) cn;
         // Nothing to send back to the user
         *plen = 0;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%x", &newpins);
         if ((ret != 1) || (newpins < 0) || (newpins > 0xff)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -297,7 +297,7 @@ static void userpins(
  * userdir():  - The user is reading or setting the direction.
  **************************************************************/
 static void userdir(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -311,12 +311,12 @@ static void userdir(
 
     pctx = (GPIO4DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%1x\n", pctx->dir);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%x", &newdir);
         if ((ret != 1) || (newdir < 0) || (newdir > 0xf)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -336,7 +336,7 @@ static void userdir(
  * mask.
  **************************************************************/
 static void userintr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -350,12 +350,12 @@ static void userintr(
 
     pctx = (GPIO4DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%1x\n", pctx->intr);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%x", &newintr);
         if ((ret != 1) || (newintr < 0) || (newintr > 0xf)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -410,7 +410,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -425,7 +425,7 @@ static void noAck(
     GPIO4DEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

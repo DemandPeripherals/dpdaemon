@@ -224,7 +224,7 @@ int Initialize(
     pctx = (LCD6DEV *) malloc(sizeof(LCD6DEV));
     if (pctx == (LCD6DEV *) 0) {
         // Malloc failure this early?
-        edlog(M_LCD6MEM);
+        dplog(M_LCD6MEM);
         return (-1);
     }
 
@@ -284,7 +284,7 @@ static void packet_hdlr(
 
     // There are no other packets from the LCD6 FPGA code so if we
     // get here there is a problem.  Log the error.
-    edlog("invalid lcd6 packet from board to host");
+    dplog("invalid lcd6 packet from board to host");
 
     return;
 }
@@ -296,7 +296,7 @@ static void packet_hdlr(
  * current value into the supplied buffer.
  **************************************************************/
 static void lcd6user(
-    int      cmd,      //==DPGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -317,13 +317,13 @@ static void lcd6user(
 
     // Look for input from the user, the most common case
     // Is this a display update?
-    if ((cmd == EDSET) && (rscid == RSC_DISP )) {
+    if ((cmd == DPSET) && (rscid == RSC_DISP )) {
         strncpy(pctx->text, val, MAX_TEXT_LEN - 1);
         pctx->text[MAX_TEXT_LEN - 1] = (char) 0;  // as a precaution
         text_to_segs(pctx->text, pctx->segs);
     }
     // Is this a direct write to the segments?
-    else if ((cmd == EDSET) && (rscid == RSC_SEGS )) {
+    else if ((cmd == DPSET) && (rscid == RSC_SEGS )) {
         ssret = sscanf(val, "%x %x %x %x %x %x", &(ns[0]), &(ns[1]),
                        &(ns[2]), &(ns[3]), &(ns[4]), &(ns[5]));
         if (ssret != 6) {
@@ -336,12 +336,12 @@ static void lcd6user(
     }
 
     // Return the display value or the segment values
-    else if ((cmd == EDGET) && (rscid == RSC_DISP )) {
+    else if ((cmd == DPGET) && (rscid == RSC_DISP )) {
         ret = snprintf(buf, *plen, "%s\n", pctx->text);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDGET) && (rscid == RSC_SEGS )) {
+    else if ((cmd == DPGET) && (rscid == RSC_SEGS )) {
         ret = snprintf(buf, *plen, "%02x %02x %02x %02x %02x %02x\n",
                  pctx->segs[0], pctx->segs[1], pctx->segs[2], pctx->segs[3],
                  pctx->segs[4], pctx->segs[5]);
@@ -362,7 +362,7 @@ static void lcd6user(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -614,7 +614,7 @@ static void noAck(
     LCD6DEV *pctx)    // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

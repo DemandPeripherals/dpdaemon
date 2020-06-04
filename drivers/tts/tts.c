@@ -4,13 +4,13 @@
  *  Description: Text-to-speech using CMU Festival Lite, flite
  *
  *  Resources:
- *    voice   - which voice to use when speaking (edget, edset)
- *    speak   - the word to speak (edset)
- *    status  - Whether the system is busy or not (edget, edcat)
+ *    voice   - which voice to use when speaking (dpget, dpset)
+ *    speak   - the word to speak (dpset)
+ *    status  - Whether the system is busy or not (dpget, dpcat)
  */
 
 /*
- * Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2020 by Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or
@@ -106,7 +106,7 @@ int Initialize(
     pctx = (TTS *) malloc(sizeof(TTS));
     if (pctx == (TTS *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in tts initialization");
+        dplog("memory allocation failure in tts initialization");
         return (-1);
     }
 
@@ -151,7 +151,7 @@ int Initialize(
  * for each resource if you wish.)
  **************************************************************/
 void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -169,23 +169,23 @@ void usercmd(
     pctx = (TTS *) pslot->priv;
 
 
-    if ((cmd == EDGET) && (rscid == RSC_VOICE)) {
+    if ((cmd == DPGET) && (rscid == RSC_VOICE)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->voice);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_STATUS)) {
+    else if ((cmd == DPGET) && (rscid == RSC_STATUS)) {
         if (pctx->child1 == -1)
             ret = snprintf(buf, *plen, "IDLE\n");
         else
             ret = snprintf(buf, *plen, "BUSY\n");
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDSET) && (rscid == RSC_VOICE)) {
+    else if ((cmd == DPSET) && (rscid == RSC_VOICE)) {
         strncpy(pctx->voice, val, VOICELEN-1);
         pctx->voice[VOICELEN - 1] = (char) 0;
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDSET) && (rscid == RSC_SPEAK)) {
+    else if ((cmd == DPSET) && (rscid == RSC_SPEAK)) {
         // Return an error if the tts is already in use
         if (pctx->child1 != -1) {
             ret = snprintf(buf, *plen, "BUSY\n");
@@ -196,17 +196,17 @@ void usercmd(
         ret = pipe2(pctx->pipefd, O_NONBLOCK | O_CLOEXEC);
         if (ret != 0) {
             (void) snprintf(tmpbuf, MX_LINE, "pipe() call fails : %s", strerror(ret));
-            edlog(tmpbuf);
+            dplog(tmpbuf);
             *plen = 0;     // Unusual error so logged but no UI error msg
             return;
         }
         // Add read fd to select list.  We get the speak status through it
-        add_fd(pctx->pipefd[0], ED_READ, speak_complete, pctx);
+        add_fd(pctx->pipefd[0], DP_READ, speak_complete, pctx);
         // spawn a process that will spawn and waitfor the flite command
         pctx->child1 = fork();
         if (pctx->child1 < 0) {
             (void) snprintf(tmpbuf, MX_LINE, "fork() call fails : %s", strerror(ret));
-            edlog(tmpbuf);
+            dplog(tmpbuf);
             *plen = 0;     // Unusual error so logged but no UI error msg
             return;
         }
@@ -220,7 +220,7 @@ void usercmd(
         child2 = fork();
         if (child2 < 0) {
             (void) snprintf(tmpbuf, MX_LINE, "fork() call fails : %s", strerror(ret));
-            edlog(tmpbuf);
+            dplog(tmpbuf);
             *plen = 0;     // Unusual error so logged but no UI error msg
             return;
         }
@@ -232,7 +232,7 @@ void usercmd(
             if (ret == -1) {
                 // error waiting for the flite command exit
                 (void) snprintf(tmpbuf, MX_LINE, "fork() call fails : %s", strerror(ret));
-                edlog(tmpbuf);
+                dplog(tmpbuf);
                 *plen = 0;     // Unusual error so logged but no UI error msg
                 return;
             }
@@ -253,7 +253,7 @@ void usercmd(
 
         // to get here the above exec must have failed.  Log this error
         (void) snprintf(tmpbuf, MX_LINE, "execl() call fails : %s", strerror(ret));
-        edlog(tmpbuf);
+        dplog(tmpbuf);
         // tell the parent we are done
         ret = snprintf(tmpbuf, MX_LINE-1, "%d", wstatus);
         if (ret > 0) {

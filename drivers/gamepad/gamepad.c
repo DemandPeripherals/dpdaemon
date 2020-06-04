@@ -108,7 +108,7 @@ int Initialize(
     pctx = (GAMEPAD *) malloc(sizeof(GAMEPAD));
     if (pctx == (GAMEPAD *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in gamepad initialization");
+        dplog("memory allocation failure in gamepad initialization");
         return (-1);
     }
 
@@ -121,7 +121,7 @@ int Initialize(
     // now open and register the gamepad device
     pctx->gpfd = open(pctx->device, (O_RDONLY | O_NONBLOCK));
     if (pctx->gpfd != -1) {
-        add_fd(pctx->gpfd, ED_READ, getevents, (void *) pctx);
+        add_fd(pctx->gpfd, DP_READ, getevents, (void *) pctx);
     }
     pctx->ts = 0;
     pctx->buttons = 0;
@@ -169,7 +169,7 @@ int Initialize(
 
     // Start the timer to broadcast state info
     if (pctx->period != 0)
-        pctx->ptimer = add_timer(ED_PERIODIC, pctx->period, sendstate, (void *) pctx);
+        pctx->ptimer = add_timer(DP_PERIODIC, pctx->period, sendstate, (void *) pctx);
     else
         pctx->ptimer = (void *) 0;
 
@@ -182,7 +182,7 @@ int Initialize(
  * resources. 
  **************************************************************/
 void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -198,19 +198,19 @@ void usercmd(
 
     pctx = (GAMEPAD *) pslot->priv;
 
-    if ((cmd == EDGET) && (rscid == RSC_PERIOD)) {
+    if ((cmd == DPGET) && (rscid == RSC_PERIOD)) {
         ret = snprintf(buf, *plen, "%d\n", pctx->period);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_FILTER)) {
+    else if ((cmd == DPGET) && (rscid == RSC_FILTER)) {
         ret = snprintf(buf, *plen, "%05x\n", pctx->filter);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_DEVICE)) {
+    else if ((cmd == DPGET) && (rscid == RSC_DEVICE)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->device);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDSET) && (rscid == RSC_PERIOD)) {
+    else if ((cmd == DPSET) && (rscid == RSC_PERIOD)) {
         ret = sscanf(val, "%d", &nperiod);
         if ((ret != 1) || (nperiod < 0)) {
             *plen = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -224,10 +224,10 @@ void usercmd(
             del_timer(pctx->ptimer);
         }
         if (pctx->period != 0) {
-            pctx->ptimer = add_timer(ED_PERIODIC, pctx->period, sendstate, (void *) pctx);
+            pctx->ptimer = add_timer(DP_PERIODIC, pctx->period, sendstate, (void *) pctx);
         }
     }
-    else if ((cmd == EDSET) && (rscid == RSC_FILTER)) {
+    else if ((cmd == DPSET) && (rscid == RSC_FILTER)) {
         ret = sscanf(val, "%x", &nfilter);
         if ((ret != 1) || (nfilter > (1 << 24))) {
             *plen = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -236,7 +236,7 @@ void usercmd(
         // record the new filter
         pctx->filter = nfilter;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_DEVICE)) {
+    else if ((cmd == DPSET) && (rscid == RSC_DEVICE)) {
         // Val has the new device path.  Just copy it.
         (void) strncpy(pctx->device, val, PATH_MAX);
         // strncpy() does not force a null.  We add one now as a precaution
@@ -250,7 +250,7 @@ void usercmd(
         // now open and register the new device
         pctx->gpfd = open(pctx->device, (O_RDONLY | O_NONBLOCK));
         if (pctx->gpfd != -1) {
-            add_fd(pctx->gpfd, ED_READ, getevents, (void *) pctx);
+            add_fd(pctx->gpfd, DP_READ, getevents, (void *) pctx);
         }
         else {
             *plen = snprintf(buf, *plen, M_NOPORT, pslot->rsc[rscid].name);

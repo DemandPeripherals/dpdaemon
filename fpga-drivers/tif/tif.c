@@ -146,7 +146,7 @@ int Initialize(
     pctx = (TIFDEV *) malloc(sizeof(TIFDEV));
     if (pctx == (TIFDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in tif initialization");
+        dplog("memory allocation failure in tif initialization");
         return (-1);
     }
 
@@ -252,7 +252,7 @@ static void packet_hdlr(
     if ((pkt->cmd & DP_CMD_OP_MASK) == DP_CMD_OP_READ) {
         // Sanity check
         if ((pkt->reg != TIF_R_KEYPAD) || (pkt->count != 2)) {
-            edlog("invalid tif read response from board to host");
+            dplog("invalid tif read response from board to host");
             return;
         }
 
@@ -307,7 +307,7 @@ static void packet_hdlr(
         // to say how many bytes did not get into the FIFO.
         rcount = pkt->data[0] / 2;   // 2 packet bytes per 9-bit character
         if (rcount > pctx->idx) {  // more than sent?????
-            edlog("invalid tif fifo write response from board to host");
+            dplog("invalid tif fifo write response from board to host");
             return;
         }
         else if ((rcount == 0) && (pctx->idx == (pkt->count / 2))) {
@@ -336,7 +336,7 @@ static void packet_hdlr(
  * user_hdlr():  - The user is reading or setting a resource
  **************************************************************/
 static void user_hdlr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -355,12 +355,12 @@ static void user_hdlr(
 
     // Possible UI is for LEDs, tone, text, or commands
     if (rscid == RSC_LEDS) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%1x\n", pctx->leds);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%x", &tmp1);
             if ((ret != 1) || (tmp1 < 0) || (tmp1 > 0x7)) {
                 ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -373,13 +373,13 @@ static void user_hdlr(
         }
     }
     else if (rscid == RSC_TONE) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%d %d %d\n", pctx->dur, pctx->tone,
                            pctx->vol);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%d %d %d", &tmp1, &tmp2, &tmp3);
             if ((ret != 3) ||                  // must get all three values
                 (tmp1 < 0) ||                  // duration must be positive
@@ -543,7 +543,7 @@ static void sendtofpga(
         return;
     }
     if (pctx->ptimer == 0) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
 
     return;
@@ -559,7 +559,7 @@ static void noAck(
     TIFDEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     // We want to clear the packet pending flag for text or commands.
     // This will also clear it for missing ack for tone and leds too.

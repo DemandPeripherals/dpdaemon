@@ -43,7 +43,7 @@ output.
 EXAMPLES
 Watch the state transitions as you speak a phrase using the
 slt voice.
-   edcat tts status &
-   edset tts voice awb
-   edset tts speak To be, or not to be.  That is the question.
+  dpdcat tts status &
+  dpdset tts voice awb
+  dpdset tts speak To be, or not to be.  That is the question.
 

@@ -110,7 +110,7 @@ int Initialize(
     pctx = (VL53 *) malloc(sizeof(VL53));
     if (pctx == (VL53 *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in vl53 initialization");
+        dplog("memory allocation failure in vl53 initialization");
         return (-1);
     }
 
@@ -126,12 +126,12 @@ int Initialize(
     pctx->vl53fd = tofInit(pctx->i2c_channel, I2C_DEV_ID, pctx->longrange);
     if (pctx->vl53fd != -1) {
 	    tofGetModel(&pctx->model, &pctx->revision);
-        add_fd(pctx->vl53fd, ED_READ, rangecb, (void *) pctx);
+        add_fd(pctx->vl53fd, DP_READ, rangecb, (void *) pctx);
     }
     else
     {
         // TODO: what is the correct way to handle a bad open???
-        edlog("device could not be opened");
+        dplog("device could not be opened");
         return (-1);
     }
     
@@ -175,7 +175,7 @@ int Initialize(
 
     // Start the timer to broadcast state info
     if (pctx->period != 0)
-        pctx->ptimer = add_timer(ED_PERIODIC, pctx->period, rangecb, (void *) pctx);
+        pctx->ptimer = add_timer(DP_PERIODIC, pctx->period, rangecb, (void *) pctx);
     else
         pctx->ptimer = (void *) 0;
 
@@ -188,7 +188,7 @@ int Initialize(
  * resources. 
  **************************************************************/
 void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -205,7 +205,7 @@ void usercmd(
     pctx = (VL53 *) pslot->priv;
 
     // get resource values
-    if (cmd == EDGET)
+    if (cmd == DPGET)
     {
         switch (rscid)
         {
@@ -262,7 +262,7 @@ void usercmd(
                 pctx->vl53fd = tofInit(pctx->i2c_channel, I2C_DEV_ID, pctx->longrange);
                 if (pctx->vl53fd != -1) {
 	                tofGetModel(&pctx->model, &pctx->revision);
-                    add_fd(pctx->vl53fd, ED_READ, rangecb, (void *) pctx);
+                    add_fd(pctx->vl53fd, DP_READ, rangecb, (void *) pctx);
                 }
                 else
                 {
@@ -295,7 +295,7 @@ void usercmd(
                 pctx->vl53fd = tofInit(pctx->i2c_channel, I2C_DEV_ID, pctx->longrange);
                 if (pctx->vl53fd != -1) {
 	                tofGetModel(&pctx->model, &pctx->revision);
-                    add_fd(pctx->vl53fd, ED_READ, rangecb, (void *) pctx);
+                    add_fd(pctx->vl53fd, DP_READ, rangecb, (void *) pctx);
                 }
                 else
                 {
@@ -324,7 +324,7 @@ void usercmd(
                     del_timer(pctx->ptimer);
                 }
                 if (pctx->period != 0) {
-                    pctx->ptimer = add_timer(ED_PERIODIC, pctx->period, rangecb, (void *) pctx);
+                    pctx->ptimer = add_timer(DP_PERIODIC, pctx->period, rangecb, (void *) pctx);
                 }
                 
                 break;

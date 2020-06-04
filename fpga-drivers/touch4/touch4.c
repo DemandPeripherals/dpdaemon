@@ -123,7 +123,7 @@ int Initialize(
     pctx = (TOUCH4DEV *) malloc(sizeof(TOUCH4DEV));
     if (pctx == (TOUCH4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in touch4 initialization");
+        dplog("memory allocation failure in touch4 initialization");
         return (-1);
     }
 
@@ -214,7 +214,7 @@ static void packet_hdlr(
     // the counters should come in since we don't ever read the rate
     // (eight 16 bit numbers takes _32_ bytes.)
     if ((pkt->reg != COUNT4_REG_COUNT0) || (pkt->count != 16)) {
-        edlog("invalid touch4 packet from board to host");
+        dplog("invalid touch4 packet from board to host");
         return;
     }
 
@@ -270,7 +270,7 @@ static void packet_hdlr(
  * userparm():  - The user is reading or setting a configuration param
  **************************************************************/
 static void userparm(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -285,13 +285,13 @@ static void userparm(
     pctx = (TOUCH4DEV *) pslot->priv;
 
     if (rscid == RSC_THRESHOLDS) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%d %d %d %d\n", pctx->thresh[0],
                           pctx->thresh[1], pctx->thresh[2], pctx->thresh[3]);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             pctx->edges = 0xff;
             ret = sscanf(val, "%d %d %d %d", &t1, &t2, &t3, &t4);
             if ((ret != 4) ||
@@ -339,7 +339,7 @@ static void tofpga(
 
     // Start timer to look for a write response.
     if ((txret == 0) && (pctx->ptimer == 0)) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
 
     return;
@@ -357,7 +357,7 @@ static void noAck(
     TOUCH4DEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

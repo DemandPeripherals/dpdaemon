@@ -88,8 +88,8 @@ extern int  add_so(char *);
  *  - System-wide global variable allocation
  ***************************************************************************/
 SLOT     Slots[MX_PLUGIN];     // Allocate the driver table
-ED_FD    Ed_Fd[MX_FD];         // Table of open FDs and callbacks
-ED_TIMER Timers[MX_TIMER];     // Table of timers
+DP_FD    Dp_Fd[MX_FD];         // Table of open FDs and callbacks
+DP_TIMER Timers[MX_TIMER];     // Table of timers
 UI       UiCons[MX_UI];        // Table of UI connections
 int      UseStderr = 0; // use stderr
 int      Verbosity = 0; // verbosity level
@@ -203,14 +203,14 @@ void globalinit()
     }
 
     for (i = 0; i < MX_FD; i++) {
-        Ed_Fd[i].fd       = -1;
-        Ed_Fd[i].stype    = 0;    // read, write, or except
-        Ed_Fd[i].scb      = NULL; // callback on select() activity
-        Ed_Fd[i].pcb_data = (void *) NULL; // data included in call of callback
+        Dp_Fd[i].fd       = -1;
+        Dp_Fd[i].stype    = 0;    // read, write, or except
+        Dp_Fd[i].scb      = NULL; // callback on select() activity
+        Dp_Fd[i].pcb_data = (void *) NULL; // data included in call of callback
     }
 
     for (i = 0; i < MX_TIMER; i++) {
-        Timers[i].type     = ED_UNUSED;
+        Timers[i].type     = DP_UNUSED;
         Timers[i].type     = 0;           // one-shot, periodic, or unused
         Timers[i].to       = (long long) 0; // ms since Jan 1, 1970 to timeout
         Timers[i].us       = 0;           // period or timeout interval in uS
@@ -266,8 +266,8 @@ void processcmdline(int argc, char *argv[])
 
             case 'v':
                 Verbosity = atoi(optarg);
-                Verbosity = (Verbosity < ED_VERB_OFF)  ? ED_VERB_OFF : Verbosity;
-                Verbosity = (Verbosity > ED_VERB_TRACE) ? ED_VERB_TRACE : Verbosity;
+                Verbosity = (Verbosity < DP_VERB_OFF)  ? DP_VERB_OFF : Verbosity;
+                Verbosity = (Verbosity > DP_VERB_TRACE) ? DP_VERB_TRACE : Verbosity;
                 break;
 
             case 'd':
@@ -331,7 +331,7 @@ void daemonize()
 
     // go into the background
     if ((dpid = fork()) < 0) {
-        edlog(M_NOFORK, strerror(errno));
+        dplog(M_NOFORK, strerror(errno));
         exit(-1);
     }
     if (dpid > 0) {
@@ -341,13 +341,13 @@ void daemonize()
 
     // become process and session leader
     if ((dpid = setsid()) < 0) {
-        edlog(M_NOSID, strerror(errno));
+        dplog(M_NOSID, strerror(errno));
         exit(-1);
     }
 
     // set the current directory
     if (chdir("/") < 0) {
-        edlog(M_NOCD, strerror(errno));
+        dplog(M_NOCD, strerror(errno));
         exit(-1);
     }
 
@@ -355,23 +355,23 @@ void daemonize()
     close(STDIN_FILENO);
     fd = open("/dev/null", O_RDONLY | O_NOCTTY);
     if (fd < 0) {
-        edlog(M_NONULL, strerror(errno));
+        dplog(M_NONULL, strerror(errno));
         exit(-1);
     }
     else if (fd != 0) {
         // no stdio
-        edlog(M_NOREDIR, "stdin");
+        dplog(M_NOREDIR, "stdin");
         exit(-1);
     }
     close(STDOUT_FILENO);
     fd = open("/dev/null", O_RDONLY | O_NOCTTY);
     if (fd < 0) {
-        edlog(M_NONULL, strerror(errno));
+        dplog(M_NONULL, strerror(errno));
         exit(-1);
     }
     else if (fd != 1) {
         // no stdio
-        edlog(M_NOREDIR, "stdout");
+        dplog(M_NOREDIR, "stdout");
         exit(-1);
     }
     if (!UseStderr) {
@@ -379,12 +379,12 @@ void daemonize()
         close(STDERR_FILENO);
         fd = open("/dev/null", O_RDONLY | O_NOCTTY);
         if (fd < 0) {
-            edlog(M_NONULL, strerror(errno));
+            dplog(M_NONULL, strerror(errno));
             exit(-1);
         }
         else if (fd != 2) {
             // no stdio
-            edlog(M_NOREDIR, "stderr");
+            dplog(M_NOREDIR, "stderr");
             exit(-1);
         }
     }
@@ -410,18 +410,18 @@ void invokerealtimeextensions()
     // change the static priority to the highest possible and set FIFO
     // scheduling
     if ((pthread_getschedparam(pthread_self(), &policy, & sp) != 0)) {
-        edlog(M_BADSCHED, strerror(errno));
+        dplog(M_BADSCHED, strerror(errno));
     }
     if (policy == SCHED_OTHER) {
         sp.sched_priority = sched_get_priority_max(SCHED_FIFO);
         if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &sp) != 0) {
-            edlog(M_BADSCHED, strerror(errno));
+            dplog(M_BADSCHED, strerror(errno));
         }
     }
 
     // lock all current and future memory pages
     if (mlockall(MCL_CURRENT | MCL_FUTURE) == -1) {
-        edlog(M_BADMLOCK, strerror(errno));
+        dplog(M_BADMLOCK, strerror(errno));
     }
 }
 

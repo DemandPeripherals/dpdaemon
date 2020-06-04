@@ -287,7 +287,7 @@ int Initialize(
     pctx = (AVRDEV *) malloc(sizeof(AVRDEV));
     if (pctx == (AVRDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in avr initialization");
+        dplog("memory allocation failure in avr initialization");
         return (-1);
     }
 
@@ -354,7 +354,7 @@ int Initialize(
     pctx->clksrc = CLK_100K;
     pctx->csmode = CS_MODE_AL;
     if (send_spi(pctx) != 0) {
-        edlog(NOAVRCNF);
+        dplog(NOAVRCNF);
         return(-1);
     }
 
@@ -393,7 +393,7 @@ static void packet_hdlr(
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) )
     {
         // unknown packet
-        edlog("Invalid avr packet from board to host");
+        dplog("Invalid avr packet from board to host");
         return;
     }
 
@@ -626,7 +626,7 @@ static void packet_hdlr(
 
                 default:
                     outlen = snprintf(obuf, MAX_LINE_LEN-1, "Invalid AVR task id: %d", pctx->taskId);
-                    edlog(obuf);
+                    dplog(obuf);
                     return;
             }
             break;
@@ -911,7 +911,7 @@ static void packet_hdlr(
         {
             // invalid task
             outlen = snprintf(obuf, MAX_LINE_LEN-1, "Invalid AVR task id: %d", pctx->taskId);
-            edlog(obuf);
+            dplog(obuf);
             return;
         }
     }
@@ -943,7 +943,7 @@ static void errmsg(RSC* prsc, char *errtext)
  * machine for resource.
  **************************************************************/
 static void cb_program_mode(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for resource
     SLOT    *pslot,    // pointer to slot info.
@@ -976,12 +976,12 @@ static void cb_program_mode(
         pctx->pbuf = (unsigned char *)malloc(pctx->pmemsz);
         if (pctx->pbuf == NULL) {
             // fatal error -- log and exit
-            edlog("memory allocation error in avr ...exiting");
+            dplog("memory allocation error in avr ...exiting");
             exit(-1);
         }
 
         // define task
-        if (cmd == EDSET) {
+        if (cmd == DPSET) {
             // flash image from given file to program memory
             pctx->imsz = get_pgm_image(pctx->pbuf, SZ_32K, pctx->filename);
             if (pctx->imsz == 0)
@@ -1009,12 +1009,12 @@ static void cb_program_mode(
         pctx->pbuf = (unsigned char *)malloc(pctx->eesz);
         if (pctx->pbuf == NULL) {
             // fatal error -- log and exit
-            edlog("memory allocation error in avr ...exiting");
+            dplog("memory allocation error in avr ...exiting");
             exit(-1);
         }
 
         // define task
-        if(cmd == EDSET) {
+        if(cmd == DPSET) {
             // parse data values into transfer buffer
             pctx->imsz = 0;
             pbyte = strtok((char *) 0, ", ");
@@ -1056,7 +1056,7 @@ static void cb_program_mode(
     }
     else {
         // Unknown program command
-        edlog("Unknown AVR program type");
+        dplog("Unknown AVR program type");
         return;
     }
 
@@ -1106,7 +1106,7 @@ static void cb_program_mode(
  *
  **************************************************************/
 static void cb_data_mode(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for resource
     SLOT    *pslot,    // pointer to slot info.
@@ -1119,7 +1119,7 @@ static void cb_data_mode(
     int i, cmdLineArgc, dataQty, regIdxMin, regIdxMax;
 
     // init state machine
-    pctx->taskId = (cmd == EDSET) ? TASK_DATA_SET : TASK_DATA_GET;
+    pctx->taskId = (cmd == DPSET) ? TASK_DATA_SET : TASK_DATA_GET;
     pctx->taskState = 0;
 
     // parse values from UI into command line arg list up to max bytes
@@ -1148,7 +1148,7 @@ static void cb_data_mode(
     }
 
     // write a set of values to register(s)
-    if(cmd == EDSET) {
+    if(cmd == DPSET) {
         // number of bytes to write is number of data bytes in command line
         dataQty = cmdLineArgc - 1;
 
@@ -1209,7 +1209,7 @@ static void cb_data_mode(
 
     // Start timer to look for a read response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, no_ack, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, no_ack, (void *) pctx);
 
     return;
 }
@@ -1236,7 +1236,7 @@ int send_instruction(AVRDEV *pctx, INSTR instruction)
     if (txret == 0) {
         // Start timer to look for a read response.
         if (pctx->ptimer == 0) {
-            pctx->ptimer = add_timer(ED_ONESHOT, 100, no_ack, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, 100, no_ack, (void *) pctx);
         }
     }
 
@@ -1297,7 +1297,7 @@ static void no_ack(
     AVRDEV *pctx)
 {
     // Log missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }
@@ -1473,7 +1473,7 @@ int put_pgm_image(unsigned char *pbuf, int len, char *filename)
         // write record to file
         if (fprintf(pFile, ":%02X%04X%02X%s%02X\r\n", recordLen, offset, recordType,
                             dataStr, checksum) == EOF) {
-            edlog("Unable to write to file\n");
+            dplog("Unable to write to file\n");
             fclose(pFile);
             return -1;
         }
@@ -1482,7 +1482,7 @@ int put_pgm_image(unsigned char *pbuf, int len, char *filename)
 
     // write end of file record
     if (fprintf(pFile, ":00000001FF\r\n") == EOF) {
-        edlog("Unable to write to file\n");
+        dplog("Unable to write to file\n");
         fclose(pFile);
         return -1;
     }

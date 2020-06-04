@@ -90,7 +90,7 @@ int Initialize(
     pctx = (BB4IODEV *) malloc(sizeof(BB4IODEV));
     if (pctx == (BB4IODEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in bb4io initialization");
+        dplog("memory allocation failure in bb4io initialization");
         return (-1);
     }
 
@@ -157,7 +157,7 @@ static void packet_hdlr(
 
     // Do a sanity check on the received packet.
     if ((pkt->reg != BB4IO_REG_BUTTONS) || (pkt->count != 1)) {
-        edlog("invalid bb4io packet from board to host");
+        dplog("invalid bb4io packet from board to host");
         return;
     }
 
@@ -193,7 +193,7 @@ static void packet_hdlr(
  * value and write it into the supplied buffer.
  **************************************************************/
 static void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -213,12 +213,12 @@ static void usercmd(
     pmycore = pslot->pcore;
 
 
-    if ((cmd == EDGET) && (rscid == RSC_LEDS)) {
+    if ((cmd == DPGET) && (rscid == RSC_LEDS)) {
         ret = snprintf(buf, *plen, "%02x\n", pctx->ledval);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_LEDS)) {
+    else if ((cmd == DPSET) && (rscid == RSC_LEDS)) {
         ret = sscanf(val, "%x", &newleds);
         if ((ret != 1) || (newleds < 0) || (newleds > 0xff)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -238,10 +238,10 @@ static void usercmd(
         }
         // Start timer to look for a write response.
         if (pctx->ptimer == 0) {
-            pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
         }
     }
-    if ((cmd == EDGET) && (rscid == RSC_BUTTONS)) {
+    if ((cmd == DPGET) && (rscid == RSC_BUTTONS)) {
         // create a read packet to get the current value of the pins
         pkt.cmd = DP_CMD_OP_READ | DP_CMD_NOAUTOINC;
         pkt.core = (pslot->pcore)->core_id;
@@ -258,7 +258,7 @@ static void usercmd(
 
         // Start timer to look for a read response.
         if (pctx->ptimer == 0)
-            pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
         // lock this resource to the UI session cn
         pslot->rsc[RSC_BUTTONS].uilock = (char) cn;
@@ -306,7 +306,7 @@ static void noAck(
     BB4IODEV *pctx)    // Send LEDs of this bb4io to the FPGA
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

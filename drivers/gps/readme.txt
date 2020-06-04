@@ -30,13 +30,13 @@ number of seconds since midnight UTC.
 
 EXAMPLES
 Configure the system for 4800 baud and ttyUSB1
-    edset gps config 4800 /dev/ttyUSB1
+    dpset gps config 4800 /dev/ttyUSB1
 
 Get the status of the receiver
-    edget gps status
+    dpget gps status
 
 Start a stream of location data
-    edcat gps tll
+    dpcat gps tll
 
 
 

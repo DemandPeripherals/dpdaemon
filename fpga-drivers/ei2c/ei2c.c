@@ -120,7 +120,7 @@ int Initialize(
     pctx = (EI2CDEV *) malloc(sizeof(EI2CDEV));
     if (pctx == (EI2CDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in ei2c initialization");
+        dplog("memory allocation failure in ei2c initialization");
         return (-1);
     }
 
@@ -185,7 +185,7 @@ static void packet_hdlr(
         (pkt->count < 10))           // minimum of start,stop, and 1 byte
     {
         // unknown packet
-        edlog("invalid ei2c packet from board to host");
+        dplog("invalid ei2c packet from board to host");
         return;
     }
 
@@ -213,7 +213,7 @@ static void packet_hdlr(
     // loop through the remaining bytes watching for a write-to-read transition
     while (pix < pkt->count) {
         if (pix > pkt->count - 10) {  // sanity check
-            edlog("invalid ei2c packet from board to host");
+            dplog("invalid ei2c packet from board to host");
             return;
         }
 
@@ -276,7 +276,7 @@ static int geti2cbyte(unsigned char *pd)
  * On dpget, return current configuration to UI.
  **************************************************************/
 static void cb_config(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -291,7 +291,7 @@ static void cb_config(
     RSC *prsc = &(pslot->rsc[RSC_DATA]);
     EI2CDEV *pctx = pslot->priv;
 
-    if (cmd == EDSET) {
+    if (cmd == DPSET) {
         if (sscanf(val, "%d\n", &newspeed) != 1) {
             *plen = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
             return;
@@ -322,7 +322,7 @@ static void cb_config(
  * Response packets will be handled in packet_hdlr().
  **************************************************************/
 static void cb_data(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -338,7 +338,7 @@ static void cb_data(
 
     pctx = pslot->priv;
 
-    if(cmd == EDGET) {
+    if(cmd == DPGET) {
         // Get the bytes to send
         pctx->nbytes = 0;
         pbyte = strtok(val, ", ");
@@ -362,7 +362,7 @@ static void cb_data(
 
             // Start timer to look for a read response.
             if (pctx->ptimer == 0)
-                pctx->ptimer = add_timer(ED_ONESHOT, 100, no_ack, (void *) pctx);
+                pctx->ptimer = add_timer(DP_ONESHOT, 100, no_ack, (void *) pctx);
 
             // lock this resource to the UI session cn
             pslot->rsc[RSC_DATA].uilock = (char) cn;
@@ -399,7 +399,7 @@ static int send_i2c(EI2CDEV *pctx)
     // Sanity check:  we need at least two bytes and the first
     // byte has to be a hex value.
     if ((pctx->nbytes < 2) || (pctx->hex[0] == -1)) {
-        edlog("invalid I2C packet");
+        dplog("invalid I2C packet");
         return(pctx->nbytes);
     }
 
@@ -422,7 +422,7 @@ static int send_i2c(EI2CDEV *pctx)
     // loop through the rest of the bytes setting the bits to read or write
     for (i = 1; i < pctx->nbytes; i++) {
         if (pkt.count > (NI2CBITS - 10)) {  // check size before adding bytes
-            edlog("invalid I2C packet");
+            dplog("invalid I2C packet");
             return(pctx->nbytes);
         }
         seti2cbyte(&(pkt.data[pkt.count]), pctx->hex[i]);
@@ -437,7 +437,7 @@ static int send_i2c(EI2CDEV *pctx)
             ((inread == 0) && (pctx->hex[i+1] == -1))) {    // write to read
             inread = (pctx->hex[i+1] == -1) ? 1 : 0 ;  // compute new inread
             if (pkt.count > (NI2CBITS - 11)) {  // check size before adding bytes
-                edlog("invalid I2C packet");
+                dplog("invalid I2C packet");
                 return(pctx->nbytes);
             }
             pkt.data[pkt.count++] = I2START;  // restart for read/write switch
@@ -496,7 +496,7 @@ static void no_ack(
     EI2CDEV  *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

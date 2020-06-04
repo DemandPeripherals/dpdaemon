@@ -95,7 +95,7 @@ int Initialize(
     pctx = (WS28DEV *) malloc(sizeof(WS28DEV));
     if (pctx == (WS28DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in ws28 initialization");
+        dplog("memory allocation failure in ws28 initialization");
         return (-1);
     }
 
@@ -146,7 +146,7 @@ static void packet_hdlr(
 
     // Do a sanity check on the received packet.
     if ((pkt->reg != pctx->string) || (pkt->count != pctx->count)) {
-        edlog("invalid ws28 packet from board to host");
+        dplog("invalid ws28 packet from board to host");
         return;
     }
 
@@ -159,7 +159,7 @@ static void packet_hdlr(
  * of ws2812/sk6812 LEDs.
  **************************************************************/
 static void ws28user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -247,7 +247,7 @@ static void ws28user(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -294,7 +294,7 @@ static void noAck(
     WS28DEV *pctx)    // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

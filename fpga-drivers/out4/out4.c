@@ -85,7 +85,7 @@ int Initialize(
     pctx = (OUT4DEV *) malloc(sizeof(OUT4DEV));
     if (pctx == (OUT4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in out4 initialization");
+        dplog("memory allocation failure in out4 initialization");
         return (-1);
     }
 
@@ -139,7 +139,7 @@ static void packet_hdlr(
 
     // Do a sanity check on the received packet.
     if ((pkt->reg != OUT4_REG_OUTVAL) || (pkt->count != 1)) {
-        edlog("invalid out4 packet from board to host");
+        dplog("invalid out4 packet from board to host");
         return;
     }
 
@@ -153,7 +153,7 @@ static void packet_hdlr(
  * value and write it into the supplied buffer.
  **************************************************************/
 static void out4user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -168,7 +168,7 @@ static void out4user(
 
     pctx = (OUT4DEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%01x\n", pctx->outval);
         *plen = ret;  // (errors are handled in calling routine)
         return;
@@ -194,7 +194,7 @@ static void out4user(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -237,7 +237,7 @@ static void noAck(
     OUT4DEV *pctx)    // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

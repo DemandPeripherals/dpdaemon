@@ -156,7 +156,7 @@ int Initialize(
     pctx = (STEPUDEV *) malloc(sizeof(STEPUDEV));
     if (pctx == (STEPUDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in stepu initialization");
+        dplog("memory allocation failure in stepu initialization");
         return (-1);
     }
 
@@ -234,7 +234,7 @@ static void packet_hdlr(
     // or holding current PWM value
     if ((pkt->reg != STEPU_REG_COUNT) || (pkt->count != 2) ||
         ((pkt->cmd & DP_CMD_AUTO_MASK) == DP_CMD_AUTO_DATA)) {
-        edlog("invalid stepu packet from board to host");
+        dplog("invalid stepu packet from board to host");
         return;
     }
 
@@ -256,7 +256,7 @@ static void packet_hdlr(
  * user_hdlr():  - The user is reading or writing resources.
  **************************************************************/
 static void user_hdlr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -279,7 +279,7 @@ static void user_hdlr(
     pctx = (STEPUDEV *) pslot->priv;
     pmycore = pslot->pcore;
 
-    if ((cmd == EDGET) && (rscid == RSC_COUNT)) {
+    if ((cmd == DPGET) && (rscid == RSC_COUNT)) {
         // create a read packet to get the current value of the pins
         pkt.cmd = DP_CMD_OP_READ | DP_CMD_NOAUTOINC;
         pkt.core = (pslot->pcore)->core_id;
@@ -294,13 +294,13 @@ static void user_hdlr(
         }
         // Start timer to look for a read response.
         if (pctx->ptimer == 0)
-            pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
         // lock this resource to the UI session cn
         pslot->rsc[RSC_COUNT].uilock = (char) cn;
         // Nothing to send back to the user
         *plen = 0;
     }
-    if ((cmd == EDGET) && (rscid == RSC_CNFG)) {
+    if ((cmd == DPGET) && (rscid == RSC_CNFG)) {
         ret = snprintf(buf, *plen, "%s %s %d %d\n",
                     ((pctx->mode == 'o') ? "off" :
                      (pctx->mode == 'f') ? "full" :
@@ -311,7 +311,7 @@ static void user_hdlr(
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_COUNT)) {
+    else if ((cmd == DPSET) && (rscid == RSC_COUNT)) {
         ret = sscanf(val, "%d", &newcount);
         if ((ret != 1) || (newcount < 0) || (newcount > MAXCOUNT)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -322,7 +322,7 @@ static void user_hdlr(
         pctx->addcount = 0;           // tells sndcfg to send count not addcount
         sendconfigtofpga(pctx, plen, buf);  // send pins, dir, intr
     }
-    else if ((cmd == EDSET) && (rscid == RSC_ADD)) {
+    else if ((cmd == DPSET) && (rscid == RSC_ADD)) {
         ret = sscanf(val, "%d", &newadd);
         if ((ret != 1) || (newadd < 0) || (newadd > MAXCOUNT)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -333,7 +333,7 @@ static void user_hdlr(
         pctx->addcount = newadd;
         sendconfigtofpga(pctx, plen, buf);  // send pins, dir, intr
     }
-    else if ((cmd == EDSET) && (rscid == RSC_CNFG)) {
+    else if ((cmd == DPSET) && (rscid == RSC_CNFG)) {
         ret = sscanf(val, "%5s %8s %d %d", newmode, newdir, &newrate, &newhold);
         newmode[0] = tolower(newmode[0]);
         newdir[0] = tolower(newdir[0]);
@@ -463,7 +463,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -478,7 +478,7 @@ static void noAck(
     STEPUDEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

@@ -2,7 +2,7 @@
  * Name: ui.c
  *
  * Description: This file contains code to handle the protocol and 
- *              connections from users of the empty daemon.
+ *              connections from users of the Demand Peripherals daemon.
  *
  * Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
  *              All rights reserved.
@@ -95,14 +95,14 @@ void parse_and_execute(UI *pui)
     }
 
     // Show/log commands if really verbose
-    if (Verbosity >= ED_VERB_WARN) {
+    if (Verbosity >= DP_VERB_WARN) {
         for (i = 0; i < pui->cmdindx; i++) {   // replace \n\r with null
             if ((pui->cmd[i] == '\n') || (pui->cmd[i] == '\r')) {
                 pui->cmd[i] = (char) 0;
                 break;
             }
         }
-        edlog("COMMAND : %s", pui->cmd);
+        dplog("COMMAND : %s", pui->cmd);
     }
 
     /* Tokenize the input line */
@@ -110,15 +110,15 @@ void parse_and_execute(UI *pui)
 
     // Get the command. 
     if (!strcmp(ccmd, CPREFIX "set"))
-        icmd = EDSET;
+        icmd = DPSET;
     else if (!strcmp(ccmd, CPREFIX "get"))
-        icmd = EDGET;
+        icmd = DPGET;
     else if (!strcmp(ccmd, CPREFIX "cat"))
-        icmd = EDCAT;
+        icmd = DPCAT;
     else if (!strcmp(ccmd, CPREFIX "list"))
-        icmd = EDLIST;
+        icmd = DPLIST;
     else if (!strcmp(ccmd, CPREFIX "loadso"))
-        icmd = EDLOAD;
+        icmd = DPLOAD;
     else {
         // Report bogus command
         len = snprintf(rply, MXRPLY, E_BDCMD, ccmd);
@@ -127,7 +127,7 @@ void parse_and_execute(UI *pui)
     }
 
     /* Do list command */
-    if (icmd == EDLIST) {
+    if (icmd == DPLIST) {
         cslot  = strtok_r(NULL, " \t\r\n", &saveptr);
         // Print list of all plug-in if there was no second argument
         // Give description of plug-in if one was specified
@@ -176,10 +176,10 @@ void parse_and_execute(UI *pui)
     }
 
     /* Do loadso command */
-    if (icmd == EDLOAD) {
+    if (icmd == DPLOAD) {
         cslot  = strtok_r(NULL, " \t\r\n", &saveptr);  // get plug-in file name
         if (cslot == 0) {
-            // edloadso without argument -- this is an error
+            // dploadso without argument -- this is an error
             len = snprintf(rply, MXRPLY, M_BADSLOT, "(null)");
             send_ui(rply, len, pui->cn); 
             prompt(pui->cn);
@@ -260,7 +260,7 @@ void parse_and_execute(UI *pui)
 
     /* Got valid command, board, slot, and resource */
     /* Do per command error checking and processing */
-    if (icmd == EDGET) {
+    if (icmd == DPGET) {
         if ((prsc->flags & IS_READABLE) == 0) {
             // report that rsc is not readable
             len = snprintf(rply, MXRPLY, E_NREAD, crsc);
@@ -288,7 +288,7 @@ void parse_and_execute(UI *pui)
         // Done.  The plug-in will send the response back to the UI */
         return;
     }
-    else if (icmd == EDSET) {
+    else if (icmd == DPSET) {
         if ((prsc->flags & IS_WRITABLE) == 0) {
             // report that rsc is not writable
             len = snprintf(rply, MXRPLY, E_NWRITE, crsc);
@@ -316,7 +316,7 @@ void parse_and_execute(UI *pui)
         }
         return;
     }
-    else if (icmd == EDCAT) {
+    else if (icmd == DPCAT) {
         // Set the broadcast key (bkey) in the resource.  If set the
         // slot's packet handler will search all the UI conns for a
         // matching key and send a copy of the sensor data down that
@@ -417,8 +417,8 @@ void send_ui(
     buf[len] = (char) 0;  // make it a null terminated string
 
     // Show/log commands if really verbose
-    if (Verbosity >= ED_VERB_INFO) {
-        edlog("RESPONSE: %s\n", buf);
+    if (Verbosity >= DP_VERB_INFO) {
+        dplog("RESPONSE: %s\n", buf);
     }
 
     while (len) {
@@ -564,7 +564,7 @@ void open_ui_conn(int srvfd, int cb_data)
     }
     if ((i == MX_UI) && (nui >= MX_UI)) {
         /* Oops, out of UI conns.  Log it and close the new conn */
-        edlog(M_NOUI);
+        dplog(M_NOUI);
         close(newuifd);
         return;
     }
@@ -582,7 +582,7 @@ void open_ui_conn(int srvfd, int cb_data)
     UiCons[i].bkey = 0;    // not watching inputs/sensors
 
     /* add the new UI conn to the read fd_set in the select loop */
-    add_fd(newuifd, ED_READ, receive_ui, (void *) 0);
+    add_fd(newuifd, DP_READ, receive_ui, (void *) 0);
 
     return;
 }
@@ -628,24 +628,24 @@ void open_ui_port()
     srvskt.sin_addr.s_addr = (UiaddrAny) ? htonl(INADDR_ANY) : htonl(INADDR_LOOPBACK);
     srvskt.sin_port = htons(UiPort);
     if ((srvfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0) {
-        edlog(M_BADCONN, errno);
+        dplog(M_BADCONN, errno);
         return;
     }
     flags = fcntl(srvfd, F_GETFL, 0);
     flags |= O_NONBLOCK;
     (void) fcntl(srvfd, F_SETFL, flags);
     if (bind(srvfd, (struct sockaddr *) &srvskt, adrlen) < 0) {
-        edlog(M_BADCONN, errno);
+        dplog(M_BADCONN, errno);
         return;
     }
     if (listen(srvfd, MX_UI - nui) < 0) {
-        edlog(M_BADCONN, errno);
+        dplog(M_BADCONN, errno);
         return;
     }
 
     /* If we get to here, then we were able to open the UI socket. Tell the
      * select loop about it. */
-    add_fd(srvfd, ED_READ, open_ui_conn, (void *) 0);
+    add_fd(srvfd, DP_READ, open_ui_conn, (void *) 0);
 }
 
 /***************************************************************************
@@ -661,7 +661,7 @@ int add_so(
     // Sanity check the length of the plug-in file name
     len = strnlen(so_name, MX_SONAME);
     if (len == MX_SONAME) {
-        edlog(M_BADSLOT, so_name);
+        dplog(M_BADSLOT, so_name);
         return(-1);
     }
     for (i = 0; i < MX_PLUGIN; i++) {
@@ -671,7 +671,7 @@ int add_so(
         }
     }
     // To get here means there were no empty slots.  Ignore request.
-    edlog(M_NOSLOT, so_name);
+    dplog(M_NOSLOT, so_name);
     return(-1);
 }
 
@@ -709,7 +709,7 @@ void initslot(                          // Load and init this slot
     handle = dlopen(pluginpath, RTLD_NOW | RTLD_GLOBAL);
     pslot->handle = handle;
     if (handle == NULL) {
-        edlog(M_BADSO, pluginpath);
+        dplog(M_BADSO, pluginpath);
         pslot->soname[0] = (char) 0;  // void this bogus plug-in entry
         return;
     }
@@ -719,13 +719,13 @@ void initslot(                          // Load and init this slot
     *(void **) (&Initialize) = dlsym(handle, "Initialize");
     errmsg = dlerror();         /* correct way to check for errors */
     if (errmsg != NULL) {
-        edlog(M_BADSYMB, "'Initialize'", pslot->soname);
+        dplog(M_BADSYMB, "'Initialize'", pslot->soname);
         pslot->soname[0] = (char) 0;  // void this bogus plug-in entry
         return;
     }
 
     if (Initialize(pslot) < 0) {
-        edlog(M_BADDRIVER, pslot->soname);
+        dplog(M_BADDRIVER, pslot->soname);
         pslot->soname[0] = (char) 0;  // void this bogus plug-in entry
         return;
     }

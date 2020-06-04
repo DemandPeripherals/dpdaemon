@@ -128,7 +128,7 @@ int Initialize(
     pctx = (QCSPIDEV *) malloc(sizeof(QCSPIDEV));
     if (pctx == (QCSPIDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in espi initialization");
+        dplog("memory allocation failure in espi initialization");
         return (-1);
     }
 
@@ -191,7 +191,7 @@ static void packet_hdlr(
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) ) {
         // unknown packet
-        edlog("invalid espi packet from board to host");
+        dplog("invalid espi packet from board to host");
         return;
     }
 
@@ -225,7 +225,7 @@ static void packet_hdlr(
  * Response packets will be handled in packet_hdlr().
  **************************************************************/
 static void cb_data(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -238,7 +238,7 @@ static void cb_data(
 
     int txret;
 
-    if(cmd == EDGET) {
+    if(cmd == DPGET) {
         QCSPIDEV *pCtx = pslot->priv;
         // Get the bytes to send
         pCtx->nbxfer = 0;
@@ -263,7 +263,7 @@ static void cb_data(
 
             // Start timer to look for a read response.
             if (pCtx->ptimer == 0)
-                pCtx->ptimer = add_timer(ED_ONESHOT, 100, no_ack, (void *) pCtx);
+                pCtx->ptimer = add_timer(DP_ONESHOT, 100, no_ack, (void *) pCtx);
 
             // lock this resource to the UI session cn
             pslot->rsc[RSC_DATA].uilock = (char) cn;
@@ -287,7 +287,7 @@ static void cb_data(
  * On dpget, return current configuration to UI.
  **************************************************************/
 static void cb_config(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -305,7 +305,7 @@ static void cb_config(
     QCSPIDEV *pCtx = pslot->priv;
     pSPIport = (SPIPORT *) &(pCtx->spiport);
 
-    if (cmd == EDSET) {
+    if (cmd == DPSET) {
         if (sscanf(val, "%d %s\n", &newclk, ibuf) != 2) {
             *plen = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
             return;
@@ -433,7 +433,7 @@ static void no_ack(
     QCSPIDEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

@@ -104,7 +104,7 @@ int Initialize(
     pctx = (SLIDE4DEV *) malloc(sizeof(SLIDE4DEV));
     if (pctx == (SLIDE4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in Slide4 initialization");
+        dplog("memory allocation failure in Slide4 initialization");
         return (-1);
     }
 
@@ -190,7 +190,7 @@ static void packet_hdlr(
     }
     // error if not a data packet or an ACK
     else {
-        edlog("invalid slide4 packet from board to host");
+        dplog("invalid slide4 packet from board to host");
         return;
     }
 }
@@ -200,7 +200,7 @@ static void packet_hdlr(
  * user():  - The user is reading the most recent values
  **************************************************************/
 static void user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -213,7 +213,7 @@ static void user(
 
     pctx = (SLIDE4DEV *) pslot->priv;
 
-    if ((cmd == EDGET) && (rscid == RSC_POSITIONS)) {
+    if ((cmd == DPGET) && (rscid == RSC_POSITIONS)) {
         ret = snprintf(buf, *plen, VALFMT, pctx->value[0], pctx->value[1],
              pctx->value[2], pctx->value[3]);
         *plen = ret;  // (errors are handled in calling routine)
@@ -251,7 +251,7 @@ static int tofpga(
 
     // Start timer to look for a write response.
     if ((txret == 0) && (pctx->ptimer == 0)) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
 
     return(txret);
@@ -267,7 +267,7 @@ static void noAck(
     SLIDE4DEV *pctx)    // this peripheral's context
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

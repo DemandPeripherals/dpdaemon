@@ -4,7 +4,7 @@ enumerator
 
 At system startup the enumerator interrogates the FPGA to
 get a list of the peripherals built into the FPGA image.
-It then does a edloadso on the peripherals listed.
+It then does a dploadso on the peripherals listed.
 Other driver modules communicate with this driver
 using this driver's 'tx_pkt()' routine.  Each driver
 that manages an FPGA peripheral must offer a 'rx_pkt'

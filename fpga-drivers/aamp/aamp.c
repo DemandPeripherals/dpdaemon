@@ -108,7 +108,7 @@ int Initialize(
     pctx = (AAMPDEV *) malloc(sizeof(AAMPDEV));
     if (pctx == (AAMPDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in aamp initialization");
+        dplog("memory allocation failure in aamp initialization");
         return (-1);
     }
 
@@ -149,7 +149,7 @@ int Initialize(
     pslot->help = README;
     
     // kick off a volume change which will also init the enabled and LED states
-    pctx->volTimer = add_timer(ED_PERIODIC, VOLUME_CHANGE_DELAY, VolumeToFpga, (void *) pctx);
+    pctx->volTimer = add_timer(DP_PERIODIC, VOLUME_CHANGE_DELAY, VolumeToFpga, (void *) pctx);
 
     return (0);
 }
@@ -177,7 +177,7 @@ static void packet_hdlr(
     
     // Error if not a write response packet
     else {
-        edlog("invalid aamp packet from board to host");
+        dplog("invalid aamp packet from board to host");
         return;
     }
 
@@ -191,7 +191,7 @@ static void packet_hdlr(
  * note and write it into the circular queue of notes to send.
  **************************************************************/
 static void aampuser(
-    int      cmd,               // ==EDGET if a read, ==DPSET on write
+    int      cmd,               // ==DPGET if a read, ==DPSET on write
     int      rscid,             // ID of resource being accessed
     char    *val,               // new value for the resource
     SLOT    *pslot,             // pointer to slot info.
@@ -210,7 +210,7 @@ static void aampuser(
 
     if (rscid == RSC_VOLUME) 
     {
-        if (cmd == EDGET) 
+        if (cmd == DPGET) 
         {
             ret = snprintf(buf, *plen, "%d\n", pctx->volume);
             *plen = ret;  // (errors are handled in calling routine)
@@ -234,7 +234,7 @@ static void aampuser(
                 // from the current volume to the target volume
                 if (pctx->volTimer == 0)
                 {
-                    pctx->volTimer = add_timer(ED_PERIODIC, 100, VolumeToFpga, (void *) pctx);
+                    pctx->volTimer = add_timer(DP_PERIODIC, 100, VolumeToFpga, (void *) pctx);
                 }
             }
         }
@@ -243,7 +243,7 @@ static void aampuser(
 
     if (rscid == RSC_ENABLED) 
     {
-        if (cmd == EDGET) 
+        if (cmd == DPGET) 
         {
             ret = snprintf(buf, *plen, "%d\n", pctx->enabledState);
             *plen = ret;  // (errors are handled in calling routine)
@@ -276,7 +276,7 @@ static void aampuser(
 
     if (rscid == RSC_LED) 
     {
-        if (cmd == EDGET) 
+        if (cmd == DPGET) 
         {
             ret = snprintf(buf, *plen, "%d\n", pctx->ledState);
             *plen = ret;  // (errors are handled in calling routine)
@@ -388,7 +388,7 @@ static void VolumeToFpga(void *timer, AAMPDEV *pctx)
         dpi_tx_pkt(pmycore, &pkt, 5);
         if (pctx->ptimer == 0)
         {
-            pctx->ptimer = add_timer(ED_ONESHOT, VOLUME_CHANGE_DELAY, noAck, (void *) pctx);
+            pctx->ptimer = add_timer(DP_ONESHOT, VOLUME_CHANGE_DELAY, noAck, (void *) pctx);
         }
         
         // invert the next level of the pulse to write
@@ -453,7 +453,7 @@ static int StateFlagsToFpga(
     txret = dpi_tx_pkt(pmycore, &pkt, 5);
     if (pctx->ptimer == 0)
     {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
 
     return(txret);
@@ -469,7 +469,7 @@ static void noAck(
     AAMPDEV *pctx)    // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

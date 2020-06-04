@@ -149,7 +149,7 @@ int Initialize(
     pctx = (RCRXDEV *) malloc(sizeof(RCRXDEV));
     if (pctx == (RCRXDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in rcrx initialization");
+        dplog("memory allocation failure in rcrx initialization");
         return (-1);
     }
 
@@ -234,7 +234,7 @@ static void packet_hdlr(
               ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA)) ||
             ((pkt->reg == REG_RCDATA) && (pkt->count == 32) &&
               ((pkt->cmd & DP_CMD_AUTO_MASK) == DP_CMD_AUTO_DATA)))) {
-        edlog("invalid rcrx packet from board to host");
+        dplog("invalid rcrx packet from board to host");
         return;
     }
 
@@ -292,7 +292,7 @@ static void packet_hdlr(
  * userparm():  - The user is reading or setting a configuration param
  **************************************************************/
 static void userparm(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -311,12 +311,12 @@ static void userparm(
     pmycore = pslot->pcore;
 
     if (rscid == RSC_NCHAN) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%d\n", pctx->nchan);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%d", &intval);
             if ((ret != 1) || (intval > 8) || (intval < 2)) {
                 ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -327,12 +327,12 @@ static void userparm(
     }
 
     if (rscid == RSC_GPIODIR) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%d\n", pctx->gpiodir);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%d", &intval);
             if ((ret != 1) || (intval > 3) || (intval < 0)) {
                 ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -343,7 +343,7 @@ static void userparm(
     }
 
     if (rscid == RSC_GPIOVAL) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             // create a read packet to get the current value of the pins
             pkt.cmd = DP_CMD_OP_READ | DP_CMD_NOAUTOINC;
             pkt.core = pmycore->core_id;
@@ -358,13 +358,13 @@ static void userparm(
             }               
             // Start timer to look for a read response.
             if (pctx->ptimer == 0)
-                pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+                pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
             // lock this resource to the UI session cn
             pslot->rsc[RSC_GPIOVAL].uilock = (char) cn;
             // Nothing to send back to the user
             *plen = 0;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%d", &intval);
             if ((ret != 1) || (intval > 3) || (intval < 0)) {
                 ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
@@ -420,7 +420,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -435,7 +435,7 @@ static void noAck(
     RCRXDEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

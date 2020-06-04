@@ -135,7 +135,7 @@ int Initialize(
     pctx = (SERVO4DEV *) malloc(sizeof(SERVO4DEV));
     if (pctx == (SERVO4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in servo4 initialization");
+        dplog("memory allocation failure in servo4 initialization");
         return (-1);
     }
 
@@ -196,7 +196,7 @@ static void packet_hdlr(
 
     // There are no other packets from the servo FPGA code so if we
     // get here there is a problem.  Log the error.
-    edlog("invalid servo4 packet from board to host");
+    dplog("invalid servo4 packet from board to host");
 
     return;
 }
@@ -208,7 +208,7 @@ static void packet_hdlr(
  * value and write it into the supplied buffer.
  **************************************************************/
 static void servo4user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -229,12 +229,12 @@ static void servo4user(
     // index into the widths table.
 
     // print individual pulse width
-    if ((cmd == EDGET) && (rscid < NUMSERVO)) {
+    if ((cmd == DPGET) && (rscid < NUMSERVO)) {
         ret = snprintf(buf, *plen, "%d\n", pctx->width[rscid]);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDGET) {
+    else if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%d %d %d %d\n", pctx->width[0],
                  pctx->width[1], pctx->width[2], pctx->width[3]);
         *plen = ret;  // (errors are handled in calling routine)
@@ -283,7 +283,7 @@ static void servo4user(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -347,7 +347,7 @@ static void noAck(
     SERVO4DEV *pctx)    // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

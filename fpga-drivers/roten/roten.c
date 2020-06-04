@@ -94,7 +94,7 @@ int Initialize(
     pctx = (ROTENDEV *) malloc(sizeof(ROTENDEV));
     if (pctx == (ROTENDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in roten initialization");
+        dplog("memory allocation failure in roten initialization");
         return (-1);
     }
 
@@ -159,7 +159,7 @@ static void packet_hdlr(
     // the rotary counter should come in since we don't ever read
     // the LED value
     if ((pkt->reg != ROTEN_REG_COUNT) || (pkt->count != 1)) {
-        edlog("invalid roten packet from board to host");
+        dplog("invalid roten packet from board to host");
         return;
     }
 
@@ -188,7 +188,7 @@ static void packet_hdlr(
  * button state using dpget.
  **************************************************************/
 static void user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -204,17 +204,17 @@ static void user(
     pctx = (ROTENDEV *) pslot->priv;
 
     // Read of the most recent encoder values?
-    if ((cmd == EDGET) && (rscid == RSC_ENCODER)) {
+    if ((cmd == DPGET) && (rscid == RSC_ENCODER)) {
         ret = snprintf(buf, *plen, "% 4d, %d\n", pctx->count, pctx->button);
         *plen = ret;  // (errors are handled in calling routine)
     }
     // Read of the LED state?
-    else if ((cmd == EDGET) && (rscid == RSC_LED)) {
+    else if ((cmd == DPGET) && (rscid == RSC_LED)) {
         ret = snprintf(buf, *plen, "%d\n", pctx->led);
         *plen = ret;  // (errors are handled in calling routine)
     }
     // Write of the LED value?
-    else if ((cmd == EDSET) && (rscid == RSC_LED)) {
+    else if ((cmd == DPSET) && (rscid == RSC_LED)) {
         ret = sscanf(val, "%d", &newled);
         if ((ret != 1) || (newled < 0) || (newled > 1)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -266,7 +266,7 @@ static int tofpga(
 
     // Start timer to look for a write response.
     if ((txret == 0) && (pctx->ptimer == 0)) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
     return(txret);
 }
@@ -281,7 +281,7 @@ static void noAck(
     ROTENDEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

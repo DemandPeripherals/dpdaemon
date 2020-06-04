@@ -85,9 +85,9 @@ comm
    Data to and from the robot.  Use the set command to write
 messages and the cat command to receive the stream of messages.
 The form of the set command to send a message is:
-   edset irccom comm <channel_name> [text to send]
+   dpset irccom comm <channel_name> [text to send]
 For example, send the word READY to red team channel:
-   edset irccom comm g1_red READY
+   dpset irccom comm g1_red READY
 The only way to receive messages is with the cat command.  The
 messages in the data steam are of the form:
    <channel_name> <sender's_name> [text of the message]
@@ -100,16 +100,16 @@ can communicate with each other and all participants hear the referees.
 Bash configuration for a member of the red team might appear as:
 
      # connect to the local IRC server as Red6
-     edset irccom config Red6 192.168.1.20
+     dpset irccom config Red6 192.168.1.20
      # verify we are connected
-     edget irccom status
+     dpget irccom status
      # get a list of the available channels
-     edget irccom available_channels
+     dpget irccom available_channels
      # set our two channels to referee and redteam
-     edset irccom my_channels referee redteam
+     dpset irccom my_channels referee redteam
      # start listening for referee commands
-     edcat irccom comm &
+     dpcat irccom comm &
      # tell the red captain we're ready to go
-     edset irccom comm redteam ready
+     dpset irccom comm redteam ready
 
 

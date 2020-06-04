@@ -139,7 +139,7 @@ int Initialize(
     pctx = (IRCCOM *) malloc(sizeof(IRCCOM));
     if (pctx == (IRCCOM *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in irccom initialization");
+        dplog("memory allocation failure in irccom initialization");
         return (-1);
     }
 
@@ -204,7 +204,7 @@ int Initialize(
  * resources. 
  **************************************************************/
 static void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -225,11 +225,11 @@ static void usercmd(
 
     pctx = (IRCCOM *) pslot->priv;
 
-    if ((cmd == EDGET) && (rscid == RSC_CONFIG)) {
+    if ((cmd == DPGET) && (rscid == RSC_CONFIG)) {
         ret = snprintf(buf, *plen, "%s %s\n", pctx->nam, pctx->srv);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_AVCHAN)) {
+    else if ((cmd == DPGET) && (rscid == RSC_AVCHAN)) {
         if (pctx->avstatus == AVC_NOSERVER)
             ret = snprintf(buf, *plen, "Unavailable, not connected\n");
         else if (pctx->avstatus == AVC_RETRIEVING)
@@ -240,7 +240,7 @@ static void usercmd(
         }
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_STATUS)) {
+    else if ((cmd == DPGET) && (rscid == RSC_STATUS)) {
         if (pctx->status == ICM_NOSERVER)
             ret = snprintf(buf, *plen, "No server\n");
         else if (pctx->status == ICM_CONNECTING)
@@ -251,7 +251,7 @@ static void usercmd(
             ret = snprintf(buf, *plen, "Error\n");
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDGET) && (rscid == RSC_MYCHAN)) {
+    else if ((cmd == DPGET) && (rscid == RSC_MYCHAN)) {
         mxlen = *plen;       // on input plen is size of buffer
         *plen = 0;           // no character in (output) buffer to start
         for (i = 0; i < NCHAN; i++) {
@@ -263,7 +263,7 @@ static void usercmd(
         ret = snprintf(&(buf[*plen]), (mxlen - *plen), "\n");
         *plen += ret;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_CONFIG)) {
+    else if ((cmd == DPSET) && (rscid == RSC_CONFIG)) {
         pctx->status = ICM_CONNECTING;
         // Parse out the server and user nickname.  
         ptmp = val;      // get the original location of input string
@@ -286,7 +286,7 @@ static void usercmd(
 
         *plen = 0;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_MYCHAN)) {
+    else if ((cmd == DPSET) && (rscid == RSC_MYCHAN)) {
         // The user wants to connect to some new channels.  Stop listening
         // on the previous channels.
         if (pctx->status == ICM_CONNECTED) {
@@ -319,7 +319,7 @@ static void usercmd(
             }
         }
     }
-    else if ((cmd == EDSET) && (rscid == RSC_COMM)) {
+    else if ((cmd == DPSET) && (rscid == RSC_COMM)) {
         // Sanity checks for conected and valid channel
         if (pctx->status != ICM_CONNECTED) {
             ret = snprintf(buf, *plen, "Not connected\n");
@@ -406,9 +406,9 @@ static void irc_connect(
         // log error message if in debug mode
         if (DebugMode) {
             (void) snprintf(tmpbuf, MX_LINE, "%s", gai_strerror(ret));
-            edlog(tmpbuf);
+            dplog(tmpbuf);
         }
-        pctx->ptimer = add_timer(ED_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
         return;
     }
     // Resolved the server IP address(es).  Try to connect.
@@ -421,7 +421,7 @@ static void irc_connect(
         // Non-blocking so we expect -1 and errno = EINPROGRESS
         if ((ret == -1) && (errno == EINPROGRESS)) {
             // register a write callback to complete the set up
-            add_fd(pctx->ircfd, ED_WRITE, finish_connect, pctx);
+            add_fd(pctx->ircfd, DP_WRITE, finish_connect, pctx);
             return;
         }
         // There was some problem, close and try the next host
@@ -429,7 +429,7 @@ static void irc_connect(
     }
  
     // Unable to resolve the address.  Set a timer to try again
-    pctx->ptimer = add_timer(ED_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
+    pctx->ptimer = add_timer(DP_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
     freeaddrinfo(res);
     return;
 }
@@ -495,7 +495,7 @@ static void finish_connect(
     // Add the ircfd to our list of read fds if no errors.  The irc_command
     // routine will take care of cleaning up a failed connection.
     if (err == 0) {
-        add_fd(pctx->ircfd, ED_READ, irc_receive, pctx);
+        add_fd(pctx->ircfd, DP_READ, irc_receive, pctx);
         pctx->status = ICM_CONNECTED;
     }
 }
@@ -533,12 +533,12 @@ static int irc_command(
         if (DebugMode) {
             if (ret < 0) {
                 (void) snprintf(tmpbuf, MX_LINE, "%s", strerror(errno));
-                edlog(tmpbuf);
+                dplog(tmpbuf);
             }
             // else must be a partial write.  A partial write usually
             // indicates a full socket buffer and a communication problem.
             // Not strictly needed but we error out and retry the conn
-            edlog("Partial write in IRCCOM.  Retrying connection");
+            dplog("Partial write in IRCCOM.  Retrying connection");
         }
 
         // Getting here means there was a error.  Shutdown and start a
@@ -547,7 +547,7 @@ static int irc_command(
         close(pctx->ircfd);
         if (pctx->ptimer)
             del_timer(pctx->ptimer);
-        pctx->ptimer = add_timer(ED_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
         pctx->status = ICM_CONNECTING;
         pctx->avstatus = AVC_NOSERVER;
         pctx->avidx = 0;
@@ -608,7 +608,7 @@ static void irc_receive(
         del_timer(pctx->ptimer);
         pctx->ptimer = 0;
     }
-    pctx->ptimer = add_timer(ED_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
+    pctx->ptimer = add_timer(DP_ONESHOT, ICM_RETRY, irc_connect, (void *) pctx);
     pctx->status = ICM_CONNECTING;
     pctx->avstatus = AVC_NOSERVER;
     pctx->avidx = 0;

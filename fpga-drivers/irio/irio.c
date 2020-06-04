@@ -85,7 +85,7 @@ int Initialize(
     pctx = (IRIODEV *) malloc(sizeof(IRIODEV));
     if (pctx == (IRIODEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in irio initialization");
+        dplog("memory allocation failure in irio initialization");
         return (-1);
     }
 
@@ -147,7 +147,7 @@ static void packet_hdlr(
 
     // Do a sanity check on the received packet.
     if ((pkt->reg != REG_DATA) || (pkt->count != 32)) {
-        edlog("invalid irio packet from board to host");
+        dplog("invalid irio packet from board to host");
         return;
     }
 
@@ -175,7 +175,7 @@ static void packet_hdlr(
  * the FPGA card.
  **************************************************************/
 static void userxmit(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -231,7 +231,7 @@ static void userxmit(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     *plen = 0;   // no response to user on xmit
 
@@ -248,7 +248,7 @@ static void noAck(
     IRIODEV *pctx)    // the context of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

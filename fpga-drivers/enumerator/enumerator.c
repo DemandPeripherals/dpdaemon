@@ -191,7 +191,7 @@ int Initialize(
     pctx = (ENUM *) malloc(sizeof(ENUM));
     if (pctx == (ENUM *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in enumerator initialization");
+        dplog("memory allocation failure in enumerator initialization");
         return (-1);
     }
 
@@ -246,7 +246,7 @@ int Initialize(
     if (CoreFile) {
         fdcore = open(CoreFile, O_RDONLY, 0);
         if (fdcore < 0) {
-            edlog(M_NOCORE, CoreFile, strerror(errno));
+            dplog(M_NOCORE, CoreFile, strerror(errno));
             return(0);       // FPGA download failed
         }
         // "Cat" the file down the serial port
@@ -264,7 +264,7 @@ int Initialize(
 
     // add a timer to delay the completion of the init.  This
     // gives the user a chance to set the port
-    pctx->ptimr = add_timer(ED_ONESHOT, 1000, InitStep2, (void *) pctx);
+    pctx->ptimr = add_timer(DP_ONESHOT, 1000, InitStep2, (void *) pctx);
 
     return (0);
 }
@@ -274,7 +274,7 @@ int Initialize(
  * usercmd():  - The user is reading or setting a resource
  **************************************************************/
 static void usercmd(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -292,11 +292,11 @@ static void usercmd(
     pctx = (ENUM *) pslot->priv;
 
 
-    if ((cmd == EDGET) && (rscid == RSC_PORT)) {
+    if ((cmd == DPGET) && (rscid == RSC_PORT)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->port);
         *plen = ret;  // (errors are handled in calling routine)
     }
-    else if ((cmd == EDSET) && (rscid == RSC_PORT)) {
+    else if ((cmd == DPSET) && (rscid == RSC_PORT)) {
         // Val has the new port path.  Just copy it.
         (void) strncpy(pctx->port, val, PATH_MAX);
         // strncpy() does not force a null.  We add one now as a precaution
@@ -316,9 +316,9 @@ static void usercmd(
         }
 
         // add a timer kick off the reading of the ROM
-        pctx->ptimr = add_timer(ED_ONESHOT, 10, InitStep2, (void *) pctx);
+        pctx->ptimr = add_timer(DP_ONESHOT, 10, InitStep2, (void *) pctx);
     }
-    else if ((cmd == EDGET) && (rscid == RSC_TEXT)) {
+    else if ((cmd == DPGET) && (rscid == RSC_TEXT)) {
         i = 0;         // index into rom/etxt
         l = 0;         // line count
         while (i < EROM_SZ) {
@@ -371,7 +371,7 @@ static int portsetup(ENUM *pctx)
     tbuf.c_cc[VTIME] = 0;       /* no delay waiting for characters */
     int actions = TCSANOW;
     if (tcsetattr(pctx->usbFd, actions, &tbuf) < 0) {
-        edlog(M_BADPORT, pctx->port, strerror(errno));
+        dplog(M_BADPORT, pctx->port, strerror(errno));
         exit(-1);
     }
 
@@ -381,7 +381,7 @@ static int portsetup(ENUM *pctx)
     ioctl(pctx->usbFd, TIOCSSERIAL, &serial);
 
     // add callback for received characters
-    add_fd(pctx->usbFd, ED_READ, receivePkt, (void *) pctx);
+    add_fd(pctx->usbFd, DP_READ, receivePkt, (void *) pctx);
 
     // The above may reset the FPGA.  Let's give it a chance
     // to complete the reset.
@@ -504,7 +504,7 @@ static void InitStep2(
     // hangs.  We run a timer to restart the ROM read in case a packet
     // is lost and the state machine hangs.  5 seconds should be good.
     // Save the timer handle so we can cancel it on ROM read success.
-    pEnum->ptimr = add_timer(ED_ONESHOT, 5000, InitStep2, (void *) pEnum);
+    pEnum->ptimr = add_timer(DP_ONESHOT, 5000, InitStep2, (void *) pEnum);
 }
 
 
@@ -526,7 +526,7 @@ static int getSoNames(
         while (*pc++) {
             if (pc == pend) {
                 // Oops, we've scanned past the end of the ROM
-                edlog("invalid enumerator ROM");
+                dplog("invalid enumerator ROM");
                 return (-1);
             }
         }
@@ -539,7 +539,7 @@ static int getSoNames(
         while (*pc++) {         // skip to next so name
             if (pc == pend) {
                 // Oops, we've scanned past the end of the ROM
-                edlog("invalid enumerator ROM");
+                dplog("invalid enumerator ROM");
                 return (-1);
             }
         }
@@ -565,7 +565,7 @@ int dpi_tx_pkt(
 
     // sanity check
     if (len < 4) {
-        edlog("Invalid packet of length %d from core %d\n", pcore->core_id, len);
+        dplog("Invalid packet of length %d from core %d\n", pcore->core_id, len);
         return (-1);
     }
 
@@ -590,7 +590,7 @@ int dpi_tx_pkt(
     txcount = dptoslip((unsigned char *) inpkt, len, sltx);
 
     // print pkts to stdout if debug enabled
-    if (DebugMode && (Verbosity == ED_VERB_TRACE)) {
+    if (DebugMode && (Verbosity == DP_VERB_TRACE)) {
         int      i;
         printf(">>");
         for (i = 0; i < txcount; i++)
@@ -607,7 +607,7 @@ int dpi_tx_pkt(
     // other possibilities indicate something more serious -- log it.
     if (sntcount != txcount) {
         if ((sntcount == -1) && (errno != EAGAIN)) {
-            edlog("Error sending to FPGA, errno=%d\n", errno);
+            dplog("Error sending to FPGA, errno=%d\n", errno);
         }
         return (sntcount);  // return error on partial writes
     }
@@ -683,7 +683,7 @@ static void receivePkt(
     // Was there an error or has the port closed on us?
     if (rdret <= 0) {
         if ((errno != EAGAIN) || (rdret == 0)) {
-            edlog(M_NOREAD, pEnum->port);
+            dplog(M_NOREAD, pEnum->port);
             exit(-1);
         }
         // EAGAIN means it's recoverable and we just try again later
@@ -749,7 +749,7 @@ static void receivePkt(
                     slstate = IN_PACKET;
                 }
                 else {          // Protocol violation.  Report it.
-                    edlog(M_BADSLIP, pEnum->port);
+                    dplog(M_BADSLIP, pEnum->port);
                     slstate = AWAITING_PKT;
                     dpix = 0;
                 }
@@ -820,8 +820,8 @@ static void dispatch_packet(
     }
 
     if (bogus != 0)  {
-        edlog(M_BADPKT, pEnum->port);
-        if (DebugMode && (Verbosity == ED_VERB_TRACE)) {
+        dplog(M_BADPKT, pEnum->port);
+        if (DebugMode && (Verbosity == DP_VERB_TRACE)) {
             printf("<X");
             for (i = 0; i < len; i++)
                 printf(" %02x", (unsigned char) (inbuf[i]));
@@ -831,7 +831,7 @@ static void dispatch_packet(
     }
 
     // print pkts to stdout if debug enabled
-    if (DebugMode && (Verbosity == ED_VERB_TRACE)) {
+    if (DebugMode && (Verbosity == DP_VERB_TRACE)) {
         printf("<<");
         for (i = 0; i < len; i++)
             printf(" %02x", (unsigned char) (inbuf[i]));
@@ -854,7 +854,7 @@ static void dispatch_packet(
         // startup by looking to see if enumerator packet handler is
         // registered.
         if (pEnum->core[0].pcb == NULL) {
-            edlog(M_NOSO, pEnum->core[pktcore].core_id, pEnum->port); }
+            dplog(M_NOSO, pEnum->core[pktcore].core_id, pEnum->port); }
     }
 }
 

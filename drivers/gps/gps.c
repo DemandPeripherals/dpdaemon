@@ -111,7 +111,7 @@ int Initialize(
     pctx = (GPSDEV *) malloc(sizeof(GPSDEV));
     if (pctx == (GPSDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in gps initialization");
+        dplog("memory allocation failure in gps initialization");
         return (-1);
     }
 
@@ -157,7 +157,7 @@ int Initialize(
  * gpsuser():  - The user is reading or writing the GPS config.
  **************************************************************/
 void gpsuser(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -176,17 +176,17 @@ void gpsuser(
     pctx = (GPSDEV *) pslot->priv;
 
     // print individual pulse width
-    if ((cmd == EDGET) && (rscid == RSC_CONFIG)) {
+    if ((cmd == DPGET) && (rscid == RSC_CONFIG)) {
         ret = snprintf(buf, *plen, "%d %s\n", pctx->baudrate, pctx->port);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDGET) && (rscid == RSC_STATUS)) {
+    else if ((cmd == DPGET) && (rscid == RSC_STATUS)) {
         ret = snprintf(buf, *plen, "%d %d\n", pctx->status, pctx->nsat);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_CONFIG)) {
+    else if ((cmd == DPSET) && (rscid == RSC_CONFIG)) {
         ret = sscanf(val, "%d %99s", &newbaud, newport);  // !!!! 99 is GPS_STR_LEN - 1
         // baudrate must be one of the common values
         if ((ret != 2) || 
@@ -247,7 +247,7 @@ void gpsuser(
         // read callback to get the GPS sentences.
         pctx->status = 0;
         pctx->ininx = 0;
-        add_fd(pctx->gpsfd, ED_READ, gpscb, pctx);
+        add_fd(pctx->gpsfd, DP_READ, gpscb, pctx);
     }
 
     *plen = 0;    // nothing to send to the user
@@ -280,7 +280,7 @@ void gpscb(
         del_fd(fd);
         pctx->gpsfd = -1;
         pctx->status = -1;
-        edlog(M_NOREAD, pctx->port);
+        dplog(M_NOREAD, pctx->port);
         return;
     }
     else if (ret == 0) {             // done with read

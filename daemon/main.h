@@ -2,7 +2,7 @@
  * Name: main.h
  *
  * Description: This file contains the define's and data structures for use
- *              in the empty event-driven daemon
+ *              in the Demand Peripherals event-driven daemon
  *
  * Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
  *              All rights reserved.
@@ -68,10 +68,10 @@ typedef struct {
     /* the information kept for each file descriptor callback */
 typedef struct {
     int       fd;              // FD of TCP conn (=-1 if not in use)
-    int       stype;           // OR of ED_ READ, WRITE, and EXCEPT
+    int       stype;           // OR of DP_ READ, WRITE, and EXCEPT
     void      (*scb) ();       // Callback on select() activity
     void     *pcb_data;        // data included in call of callbacks
-} ED_FD;
+} DP_FD;
 
     /* structure for the timers and their callbacks */
 typedef struct {
@@ -80,7 +80,7 @@ typedef struct {
     unsigned int us;           // period or timeout interval
     void      (*cb) ();        // Callback on timeout
     void     *pcb_data;        // data included in call of callbacks
-} ED_TIMER;
+} DP_TIMER;
 
 
 

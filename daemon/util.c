@@ -53,8 +53,8 @@ struct timeval  *doTimer();
 static long long tv2us(struct timeval *);
 
 extern SLOT      Slots[];   // table of plug-in info
-extern ED_FD     Ed_Fd[];   // Array of open FDs and callbacks
-extern ED_TIMER  Timers[];  // Array of timers and callbacks
+extern DP_FD     Dp_Fd[];   // Array of open FDs and callbacks
+extern DP_TIMER  Timers[];  // Array of timers and callbacks
 extern char     *CmdName;
 extern int       UseStderr;
 
@@ -69,7 +69,7 @@ void muxmain()
     fd_set   readset;
     fd_set   writeset;
     fd_set   exceptset;
-    ED_FD   *pin;
+    DP_FD   *pin;
     int      sret;     // return value from select();
     int      activity; // type of select activity (read,write,except)
     int      i;
@@ -91,26 +91,26 @@ void muxmain()
         if (sret < 0) {
             // select error -- bail out on all but EINTR
             if (errno != EINTR) {
-                edlog(strerror(errno));
+                dplog(strerror(errno));
                 exit(-1);
             }
         }
 
         // Walk the table of FDs looking for read,write,except activity
         for (i = 0; i < MX_FD; i++) {
-            pin = &Ed_Fd[i];
+            pin = &Dp_Fd[i];
             if (pin < 0) {
                 continue;
             }
             activity = 0;
             if (FD_ISSET(pin->fd, &readset)) {
-                activity = ED_READ;
+                activity = DP_READ;
             }
             if (FD_ISSET(pin->fd, &writeset)) {
-                activity |= ED_WRITE;
+                activity |= DP_WRITE;
             }
             if (FD_ISSET(pin->fd, &exceptset)) {
-                activity |= ED_EXCEPT;
+                activity |= DP_EXCEPT;
             }
             if ((activity != 0) && (pin->scb != NULL)) {
                 pin->scb(pin->fd, pin->pcb_data, activity);
@@ -129,7 +129,7 @@ void add_fd(
     void     (*scb) (), // activity callback
     void    *pcb_data)  // callback data 
 {
-    ED_FD   *pinfo = 0;
+    DP_FD   *pinfo = 0;
     int      i;         // loop counter
 
     // Sanity check: fd must be positive and callback must be defined
@@ -138,20 +138,20 @@ void add_fd(
         return;
     }
 
-    // Find the first free entry in Ed_Fd
+    // Find the first free entry in Dp_Fd
     for (i = 0; i < MX_FD; i++) {
-        if (Ed_Fd[i].fd == -1) {
-            pinfo = &Ed_Fd[i];
+        if (Dp_Fd[i].fd == -1) {
+            pinfo = &Dp_Fd[i];
             break;
         }
     }
     if (i == MX_FD) {
-        edlog(M_NOMOREFD);
+        dplog(M_NOMOREFD);
         exit(-1);
     }
 
-    // At this point we've walked the ED_FD array and have
-    // found an empty ED_FD.  Add the new entry.
+    // At this point we've walked the DP_FD array and have
+    // found an empty DP_FD.  Add the new entry.
     pinfo->fd = fd;
     pinfo->stype = stype;
     pinfo->scb = scb;
@@ -171,8 +171,8 @@ void del_fd(
 
     // Find the FD and mark the entry as unused.
     for (i = 0; i < MX_FD; i++) {
-        if (Ed_Fd[i].fd == fd) {
-            Ed_Fd[i].fd = -1;
+        if (Dp_Fd[i].fd == fd) {
+            Dp_Fd[i].fd = -1;
             break;
         }
     }
@@ -196,26 +196,26 @@ void update_fdsets()
     mxfd = -1;
 
     for (i = 0; i < MX_FD; i++) {
-        if (Ed_Fd[i].fd == -1)
+        if (Dp_Fd[i].fd == -1)
             continue;
 
         fdcount++;
-        mxfd = (Ed_Fd[i].fd > mxfd) ? Ed_Fd[i].fd : mxfd;
-        if ((Ed_Fd[i].stype & ED_READ) != 0)
-            FD_SET(Ed_Fd[i].fd, &gRfds);
-        if ((Ed_Fd[i].stype & ED_WRITE) != 0)
-            FD_SET(Ed_Fd[i].fd, &gWfds);
-        if ((Ed_Fd[i].stype & ED_EXCEPT) != 0)
-            FD_SET(Ed_Fd[i].fd, &gXfds);
+        mxfd = (Dp_Fd[i].fd > mxfd) ? Dp_Fd[i].fd : mxfd;
+        if ((Dp_Fd[i].stype & DP_READ) != 0)
+            FD_SET(Dp_Fd[i].fd, &gRfds);
+        if ((Dp_Fd[i].stype & DP_WRITE) != 0)
+            FD_SET(Dp_Fd[i].fd, &gWfds);
+        if ((Dp_Fd[i].stype & DP_EXCEPT) != 0)
+            FD_SET(Dp_Fd[i].fd, &gXfds);
     }
     return;
 }
 
 
 /***************************************************************************
- *  edlog():  Print logmessages to stderr or syslog
+ *  dplog():  Print logmessages to stderr or syslog
  ***************************************************************************/
-void edlog(
+void dplog(
     char    *format, ...) // printf format string
 {
     va_list  ap;
@@ -271,8 +271,8 @@ void edlog(
 /***************************************************************************
  * Timers in the ED Daemon
  * 
- * #define ED_ONESHOT  0
- * #define ED_PERIODIC 1
+ * #define DP_ONESHOT  0
+ * #define DP_PERIODIC 1
  * 
  * void * add_timer(
  *       int type;             // one-shot or periodic
@@ -283,7 +283,7 @@ void edlog(
  * The 'add_timer' routine registers a subroutine ('callback')
  * for execution a set number of milliseconds from the time
  * of registration.  The timeout will occur repeatedly if the
- * type is ED_PERIODIC and will occur once if ED_ONESHOT.
+ * type is DP_PERIODIC and will occur once if DP_ONESHOT.
  * Add_timer returns a 'handle' to help identify the timer
  * in other calls.
  * 
@@ -307,7 +307,7 @@ void edlog(
 /***************************************************************************
  * doTimers(): - Scan the timer queue looking for expired timers.
  * Call the callbacks for any expired timers and either remove
- * them (ED_ONESHOT) or reschedule them (ED_PERIODIC).
+ * them (DP_ONESHOT) or reschedule them (DP_PERIODIC).
  *   Output a NULL timeval pointer if there are no timer or a
  * pointer to a valid timeval struct if there are timers.
  *
@@ -347,7 +347,7 @@ struct timeval *doTimer()
             break;
 
         // Ignore unused timers
-        if (Timers[i].type == ED_UNUSED)
+        if (Timers[i].type == DP_UNUSED)
             continue;
 
         // Found a timer in use
@@ -359,11 +359,11 @@ struct timeval *doTimer()
 
 
         // Is it a PERIODIC timer ?
-        if (Timers[i].type == ED_PERIODIC) { /* Periodic, so reschedule */
+        if (Timers[i].type == DP_PERIODIC) { /* Periodic, so reschedule */
             (Timers[i].cb) ((void *) &Timers[i], Timers[i].pcb_data); /* Do the callback */
             Timers[i].to += Timers[i].us;
             if (Timers[i].to < now) { /* CPU hog made us miss a period? */
-                edlog(M_MISSTO, i);
+                dplog(M_MISSTO, i);
                 Timers[i].to = now;
             }
         }
@@ -372,7 +372,7 @@ struct timeval *doTimer()
                 break;
             }
             else {
-                Timers[i].type = ED_UNUSED;
+                Timers[i].type = DP_UNUSED;
                 ntimers--;
                 (Timers[i].cb) ((void *) &Timers[i], Timers[i].pcb_data); // Do callback 
             }
@@ -396,7 +396,7 @@ struct timeval *doTimer()
         if (count == ntimers)
             break;
 
-        if (Timers[i].type == ED_UNUSED)
+        if (Timers[i].type == DP_UNUSED)
             continue;
 
         count++;
@@ -408,7 +408,7 @@ struct timeval *doTimer()
     // Return null if no timers are set
     if (nextto == -1) {
         // This indicates an internal error.  no timers but ntimers not zero
-        edlog("dpdaemon internal timer error");
+        dplog("dpdaemon internal timer error");
         return ((struct timeval *) 0);
     }
     // Return 0 for an immediate timeout if we missed a timeout
@@ -425,7 +425,7 @@ struct timeval *doTimer()
  * add_timer(): - register a subroutine to be executed after a
  * specified number of milliseconds.
  *
- * Input:        int   type -- ED_ONESHOT or ED_PERIODIC
+ * Input:        int   type -- DP_ONESHOT or DP_PERIODIC
  *               void  (*cb)() -- pointer to subroutine called
  *                     when the timer expires
  *               void *pcbdata -- callback data which is passed
@@ -444,32 +444,32 @@ void *add_timer(        // address of timer struct allocated
 
     /* Sanity checks */
     if (cb == (void *) 0) {
-        edlog("Adding timer with null callback");
+        dplog("Adding timer with null callback");
         return((void *) 0);
     }
-    if (ms == 0 && type == ED_PERIODIC) {
-        edlog("Periodic timer with period = 0");
-        return ((ED_TIMER *) 0);
+    if (ms == 0 && type == DP_PERIODIC) {
+        dplog("Periodic timer with period = 0");
+        return ((DP_TIMER *) 0);
     }
 
     // Walk the array of timers and find a free one
     for (i = 0; i < MX_TIMER; i++) {
-        if (Timers[i].type == ED_UNUSED)
+        if (Timers[i].type == DP_UNUSED)
             break;
     }
     if (i == MX_TIMER) {
-        edlog("No free timers");
+        dplog("No free timers");
         return ((void *) 0);
     }
 
     /* Get "now" */
     if (gettimeofday(&tv, 0)) {
         // LOG(LOG_WARNING, TM, E_No_Date);
-        return ((ED_TIMER *) 0);
+        return ((DP_TIMER *) 0);
     }
 
-    /* OK, we've got the ED_TIMER struct, now fill it in */
-    ntimers++;       /* increment number of ED_TIMER structs alloc'ed */
+    /* OK, we've got the DP_TIMER struct, now fill it in */
+    ntimers++;       /* increment number of DP_TIMER structs alloc'ed */
     Timers[i].type = type;          /* one-shot or periodic */
     Timers[i].to = tv2us(&tv) + (ms * 1000); /* us from Epoch to timeout */
     Timers[i].us = ms * 1000;       /* period or interval in uS */
@@ -494,14 +494,14 @@ void del_timer(
     if ((ptimer < (void *) &Timers[0]) || (ptimer > (void *) &Timers[MX_TIMER -1])) {
         return;
     }
-    if (((ptimer - (void *) &Timers[0]) % sizeof(ED_TIMER)) != 0) {
+    if (((ptimer - (void *) &Timers[0]) % sizeof(DP_TIMER)) != 0) {
         return;
     }
-    if (((ED_TIMER *) ptimer)->type == ED_UNUSED) {
+    if (((DP_TIMER *) ptimer)->type == DP_UNUSED) {
         return;
     }
 
-    ((ED_TIMER *) ptimer)->type = ED_UNUSED;
+    ((DP_TIMER *) ptimer)->type = DP_UNUSED;
 
     ntimers--;
 }

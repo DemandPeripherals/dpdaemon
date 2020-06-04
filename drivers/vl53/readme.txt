@@ -40,17 +40,17 @@ are in millimeters.
 
 EXAMPLE
   Set the device to I2C channel 0:
-   edset vl53 device /dev/i2c-1
+   dpset vl53 device /dev/i2c-1
 
   Get the HW revision of the range sensor:
-   edget vl53 hw_rev
+   dpget vl53 hw_rev
 
   Disable long range measurements:
-   edset vl53 longrange 0
+   dpset vl53 longrange 0
 
   Set the range measurement period:
-   edset vl53 period 200
+   dpset vl53 period 200
 
   Get a series of range measurements:
-   edcat vl53 range
+   dpcat vl53 range
 

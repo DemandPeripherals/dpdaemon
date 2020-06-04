@@ -108,7 +108,7 @@ int Initialize(
     pctx = (in32DEV *) malloc(sizeof(in32DEV));
     if (pctx == (in32DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in in32 initialization");
+        dplog("memory allocation failure in in32 initialization");
         return (-1);
     }
 
@@ -175,7 +175,7 @@ static void packet_hdlr(
     // the pins should come in since we don't ever read the output
     // or interrupt registers.
     if ((pkt->reg != IN32_R_PIN0) || (pkt->count != NPINS)) {
-        edlog("invalid in32 packet from board to host");
+        dplog("invalid in32 packet from board to host");
         return;
     }
 
@@ -213,7 +213,7 @@ static void packet_hdlr(
  * user_hdlr():  - The user is reading or setting a resource
  **************************************************************/
 static void user_hdlr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -233,12 +233,12 @@ static void user_hdlr(
 
     // Possible UI is for input or interrupt
     if (rscid == RSC_INTR) {
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             ret = snprintf(buf, *plen, "%08x\n", pctx->intr);
             *plen = ret;  // (errors are handled in calling routine)
             return;
         }
-        else if (cmd == EDSET) {
+        else if (cmd == DPSET) {
             ret = sscanf(val, "%x", &tmp);
             if (ret != 1) {
                 ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -251,7 +251,7 @@ static void user_hdlr(
         }
     }
     else {          // must be dpset or dpcat for inputs
-        if (cmd == EDGET) {
+        if (cmd == DPGET) {
             // create a read packet to get the current value of the pins
             pkt.cmd = DP_CMD_OP_READ | DP_CMD_AUTOINC;
             pkt.core = pmycore->core_id;
@@ -266,7 +266,7 @@ static void user_hdlr(
             }
             // Start timer to look for a read response.
             if (pctx->ptimer == 0)
-                pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+                pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
             // lock this resource to the UI session cn
             pslot->rsc[RSC_INPUT].uilock = cn;
             // Nothing to send back to the user
@@ -322,7 +322,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -337,7 +337,7 @@ static void noAck(
     in32DEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

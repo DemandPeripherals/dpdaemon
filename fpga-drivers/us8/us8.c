@@ -109,7 +109,7 @@ int Initialize(
     pctx = (US8DEV *) malloc(sizeof(US8DEV));
     if (pctx == (US8DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in us8 initialization");
+        dplog("memory allocation failure in us8 initialization");
         return (-1);
     }
 
@@ -190,7 +190,7 @@ static void packet_hdlr(
 
     // Sanity check: error if none of the above
     if ((pkt->reg != US8_R_TIME) || (pkt->count != 3)) {
-        edlog("invalid us8 packet from board to host");
+        dplog("invalid us8 packet from board to host");
     }
 
     return;
@@ -201,7 +201,7 @@ static void packet_hdlr(
  * user_hdlr():  - Handle reading or writing the enable register
  **************************************************************/
 static void user_hdlr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -217,12 +217,12 @@ static void user_hdlr(
     pctx = (US8DEV *) pslot->priv;
 
     // Read of the enabled state?
-    if ((cmd == EDGET) && (rscid == RSC_ENABLE)) {
+    if ((cmd == DPGET) && (rscid == RSC_ENABLE)) {
         ret = snprintf(buf, *plen, "%02x\n", pctx->enable);
         *plen = ret;  // (errors are handled in calling routine)
     }
     // Write of the enable value?
-    else if ((cmd == EDSET) && (rscid == RSC_ENABLE)) {
+    else if ((cmd == DPSET) && (rscid == RSC_ENABLE)) {
         ret = sscanf(val, "%x", &nable);
         if ((ret != 1) || (nable < 0) || (nable > 0xff)) {
             ret = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -274,7 +274,7 @@ static int sendconfigtofpga(
 
     // Start timer to look for a write response.
     if ((txret == 0) && (pctx->ptimer == 0)) {
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
     }
     return(txret);
 }
@@ -289,7 +289,7 @@ static void noAck(
     US8DEV *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

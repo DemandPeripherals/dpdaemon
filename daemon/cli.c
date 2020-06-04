@@ -1,7 +1,7 @@
 /*
  * Name: cli.c
  *
- * Description: A utility that issues commands to the empty daemon using
+ * Description: A utility that issues commands to the DP daemon using
  *              the command and parameters specified on the command line.
  *              This utility makes it easier to test your plug-ins.
  *
@@ -41,8 +41,8 @@
  **************************************************************/
         // Maximum length of an IP address string
 #define MAX_IP       50
-        // Max length of cmd down to the empty daemon
-#define MAX_EDCMD   250
+        // Max length of cmd down to the dp daemon
+#define MAX_DPCMD   250
 
 
 /**************************************************************
@@ -61,7 +61,7 @@ char helplist[];
 
 
 /**************************************************************
- * cli(): - Send commands to an empty daemon.  This program lets
+ * cli(): - Send commands to an DP daemon.  This program lets
  *           you control your application from the command line.
  *
  * Input:        argc, argv
@@ -70,18 +70,18 @@ char helplist[];
 int main(int argc, char **argv)
 {
     char bindaddress[MAX_IP]; // destination IP address as a string
-    int  bindport;          // TCP port to the empty daemon
+    int  bindport;          // TCP port to the DP daemon
     int  cmdc;              // command line character option
     int  tmp_int;           // a temporary integer
-    static int srvfd = -1;  // FD for empty daemon socket
-    struct sockaddr_in skt; // network address for empty daemon
+    static int srvfd = -1;  // FD for DP daemon socket
+    struct sockaddr_in skt; // network address for DP daemon
     int  adrlen;
     int  i;                 // generic loop counter
     int  ret;               // generic return value
-    char buf[MAX_EDCMD];    // command to send to empty daemon
+    char buf[MAX_DPCMD];    // command to send to daemon
     int  slen;              // length of string in buf
-    int  nout;              // num chars written to empty daemon
-    char c;                 // response character from empty daemon
+    int  nout;              // num chars written to DP daemon
+    char c;                 // response character from DP daemon
 
     // Set default config.  Change default behavior here.
     strncpy(bindaddress, "127.0.0.1", MAX_IP-1);
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // Open connection to empty daemon
+    // Open connection to DP daemon
     adrlen = sizeof(struct sockaddr_in);
     (void) memset((void *) &skt, 0, (size_t) adrlen);
     skt.sin_family = AF_INET;
@@ -136,44 +136,44 @@ int main(int argc, char **argv)
     if ((inet_aton(bindaddress, &(skt.sin_addr)) == 0) ||
         ((srvfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0) ||
         (connect(srvfd, (struct sockaddr *) &skt, adrlen) < 0)) {
-        printf("Error: unable to connect to the empty daemon.\n");
+        printf("Error: unable to connect to the dpdaemon.\n");
         exit(-1);
     }
 
-    // At this point the connection to the empty daemon is open
+    // At this point the connection to the DP daemon is open
     // We can now send it the command and arguments from the
     // command line.  Note that the command to send is actually
     // argv[0], that is, how this program was invoked.  Note
     // also that we start at optind, after all cmd parms.
     slen = sprintf(buf, "%s ", argv[0]);
-    for (i = optind; (i < argc && slen < MAX_EDCMD -1) ; i++) {
-        slen += snprintf(&(buf[slen]), (MAX_EDCMD - slen), "%s ", argv[i]);
+    for (i = optind; (i < argc && slen < MAX_DPCMD -1) ; i++) {
+        slen += snprintf(&(buf[slen]), (MAX_DPCMD - slen), "%s ", argv[i]);
     }
-    if (slen >= MAX_EDCMD -1) {
-        printf("Error: command exceeds maximum length of %d\n", MAX_EDCMD);
+    if (slen >= MAX_DPCMD -1) {
+        printf("Error: command exceeds maximum length of %d\n", MAX_DPCMD);
         exit(-1);
     }
     // replace trailing space of last param with a newline
     buf[slen-1] = '\n';
 
-    // write complete command to the empty daemon
+    // write complete command to the DP daemon
     nout = 0;
     while (nout != slen) {
         ret = write(srvfd, &(buf[nout]), (slen - nout));
         if ((ret < 0) && (errno == EAGAIN))
             continue;
         else if (ret <= 0) {
-            printf("Error writing to empty daemon\n");
+            printf("Error writing to dpdaemon\n");
             exit(-1);
         }
         nout += ret;
     }
 
     // Command is sent, now print the response if any.
-    // The empty daemon says the command is done by sending a ':'
+    // The DP daemon says the command is done by sending a ':'
     // character as a prompt.  Exit this program when we see
     // a prompt character.  This means that if invoked as a
-    // edcat command you will need to use ^C to exit.
+    // dpcat command you will need to use ^C to exit.
     while(1) {
         // character at a time so this won't be very efficient
         ret = read(srvfd, &c, 1);
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
             exit(0);
         }
         else if ((ret < 0) && (errno != EAGAIN)) {
-            printf("\nError reading from empty daemon connection\n");
+            printf("\nError reading from dpdaemon connection\n");
             exit(-1);
         }
         if (errno == EAGAIN) {
@@ -295,7 +295,7 @@ plug-in.\n\
 
 
 char usagetext[] = "\
-Usage is command specific.  Empty daemon command syntaxes are as follows:\n\
+Usage is command specific.  DP daemon command syntaxes are as follows:\n\
   %sset <slot#|plug-in_name> <resourcename> <value(s)>\n\
   %sget <slot#|plug-in_name> <resourcename>\n\
   %scat <slot#|plug-in_name> <resourcename>\n\

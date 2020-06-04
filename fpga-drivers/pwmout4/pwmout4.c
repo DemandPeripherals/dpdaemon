@@ -125,7 +125,7 @@ int Initialize(
     pctx = (PWM4DEV *) malloc(sizeof(PWM4DEV));
     if (pctx == (PWM4DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in pwm4 initialization");
+        dplog("memory allocation failure in pwm4 initialization");
         return (-1);
     }
 
@@ -184,7 +184,7 @@ static void packet_hdlr(
 
     // There are no other packets from the pwm FPGA code so if we
     // get here there is a problem.  Log the error.
-    edlog("invalid pwm4 packet from board to host");
+    dplog("invalid pwm4 packet from board to host");
 
     return;
 }
@@ -196,7 +196,7 @@ static void packet_hdlr(
  * value and write it into the supplied buffer.
  **************************************************************/
 static void pwm4user(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -215,18 +215,18 @@ static void pwm4user(
     pctx = (PWM4DEV *) pslot->priv;
 
     // print individual pulse width
-    if ((cmd == EDGET) && (rscid == RSC_CONFIG)) {
+    if ((cmd == DPGET) && (rscid == RSC_CONFIG)) {
         ret = snprintf(buf, *plen, "%d\n", pctx->freq);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDGET) && (rscid == RSC_PWMS)) {
+    else if ((cmd == DPGET) && (rscid == RSC_PWMS)) {
         ret = snprintf(buf, *plen, "%4x %4x %4x %4x\n", pctx->width[0],
                  pctx->width[1], pctx->width[2], pctx->width[3]);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_CONFIG)) {
+    else if ((cmd == DPSET) && (rscid == RSC_CONFIG)) {
         ret = sscanf(val, "%d", &newfreq);
         // frequency must be one of the valid values
         if ((ret != 1) || 
@@ -245,7 +245,7 @@ static void pwm4user(
         // Valid new frequency
         pctx->freq = newfreq;
     }
-    else if ((cmd == EDSET) && (rscid == RSC_PWMS)) {
+    else if ((cmd == DPSET) && (rscid == RSC_PWMS)) {
         ret = sscanf(val, "%x %x %x %x", &nw[0], &nw[1], &nw[2], &nw[3]);
         for (i = 0; i < NUMPWM; i++) {
             if (nw[i] > 0x1000)
@@ -273,7 +273,7 @@ static void pwm4user(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -424,7 +424,7 @@ static void noAck(
     PWM4DEV *pctx)      // points to instance of this peripheral
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

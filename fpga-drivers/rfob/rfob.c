@@ -129,7 +129,7 @@ int Initialize(
     pctx = (RFOBDEV *) malloc(sizeof(RFOBDEV));
     if (pctx == (RFOBDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in rfob initialization");
+        dplog("memory allocation failure in rfob initialization");
         return (-1);
     }
 
@@ -194,7 +194,7 @@ static void packet_hdlr(
     // the cmds should come in since we don't ever read the bits
     // or baud registers.
     if ((pkt->reg != RFOB_REG_CMDS) || (pkt->count != pctx->bits)) {
-        edlog("invalid rfob packet from board to host");
+        dplog("invalid rfob packet from board to host");
         return;
     }
 
@@ -222,7 +222,7 @@ static void packet_hdlr(
  * userconfig():  - The user is reading or setting the configuration
  **************************************************************/
 static void userconfig(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -237,12 +237,12 @@ static void userconfig(
 
     pctx = (RFOBDEV *) pslot->priv;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         ret = snprintf(buf, *plen, "%d %d\n", pctx->bits, pctx->baud);
         *plen = ret;  // (errors are handled in calling routine)
         return;
     }
-    else if (cmd == EDSET) {
+    else if (cmd == DPSET) {
         ret = sscanf(val, "%d %d", &newbits, &newbaud);
         if ((ret != 2) ||
             (newbits < 1) || (newbits > 32) ||
@@ -304,7 +304,7 @@ static void sendconfigtofpga(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return;
 }
@@ -319,7 +319,7 @@ static void noAck(
     RFOBDEV  *pctx)    // the peripheral with a timeout
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

@@ -128,7 +128,7 @@ int Initialize(
     pctx = (RTCDEV *) malloc(sizeof(RTCDEV));
     if (pctx == (RTCDEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in espi initialization");
+        dplog("memory allocation failure in espi initialization");
         return (-1);
     }
 
@@ -201,7 +201,7 @@ static void packet_hdlr(
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) ) {
         // unknown packet
-        edlog("invalid rtc packet from board to host");
+        dplog("invalid rtc packet from board to host");
         return;
     }
 
@@ -295,7 +295,7 @@ static void packet_hdlr(
  * Setting the alarm affects registers 01 and 09 to 0B.
  **************************************************************/
 static void user_hdlr(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -315,7 +315,7 @@ static void user_hdlr(
     pctx = (RTCDEV *) pslot->priv;
     pmycore = pslot->pcore;
 
-    if (cmd == EDGET) {
+    if (cmd == DPGET) {
         // Reading any resource causes a read from the device.
         // The packet handler sorts out what to return to the user.
         // Read registers 01 through 0B (11 regs) + 1 for the count
@@ -328,7 +328,7 @@ static void user_hdlr(
         pslot->rsc[rscid].uilock = (char) cn;
         pctx->nbxfer = pkt.data[0];
     }
-    else if ((cmd == EDSET) && (rscid == RSC_TIME)) {
+    else if ((cmd == DPSET) && (rscid == RSC_TIME)) {
         // 2018-09-21 14:45:23
         ret = sscanf(val, "%4d-%2d-%2d %2d:%2d:%2d",
                      &year, &mon, &day, &hour, &min, &sec);
@@ -349,7 +349,7 @@ static void user_hdlr(
         pkt.data[7] = (mon % 10) + ((mon / 10) << 4);
         pkt.data[8] = (year % 10) + (((year - 2000) / 10) << 4);
     }
-    else if ((cmd == EDSET) && (rscid == RSC_ALARM)) {
+    else if ((cmd == DPSET) && (rscid == RSC_ALARM)) {
         ret = sscanf(val, "%2d %2d:%2d\n", &aday, &ahour, &amin);
         if ((ret != 3) || (amin > 59) || (amin < 0) || (ahour > 23) ||
             (ahour < 0) || (aday > 31) || (aday < 1)) {
@@ -364,7 +364,7 @@ static void user_hdlr(
         pkt.data[4] = (aday % 10) + ((aday / 10) << 4);
         pkt.data[5] = 0x80;   // disable weekday alarm
     }
-    else if ((cmd == EDSET) && (rscid == RSC_STATE)) {
+    else if ((cmd == DPSET) && (rscid == RSC_STATE)) {
         // looking for off, on, or enabled
         newstate[MXLINELN-1] = (char) 0;
         ret = sscanf(val, "%s", newstate);
@@ -405,7 +405,7 @@ static void user_hdlr(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     // Nothing to send back to the user
     *plen = 0;
@@ -423,7 +423,7 @@ static void noAck(
     RTCDEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }

@@ -127,7 +127,7 @@ int Initialize(
     pctx = (DAC8DEV *) malloc(sizeof(DAC8DEV));
     if (pctx == (DAC8DEV *) 0) {
         // Malloc failure this early?
-        edlog("memory allocation failure in espi initialization");
+        dplog("memory allocation failure in espi initialization");
         return (-1);
     }
 
@@ -154,7 +154,7 @@ int Initialize(
     pctx->state = ST_CONFIG_1; // Init by sending power down release
     txret = send_spi(pctx);
     if (txret != 0) {          // Failed to send init SPI packet ?
-        edlog(E_WRFPGA);
+        dplog(E_WRFPGA);
     }
 
     return (0);
@@ -187,7 +187,7 @@ static void packet_hdlr(
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 3)))) {
-        edlog("invalid dac8 packet from board to host");
+        dplog("invalid dac8 packet from board to host");
         return;
     }
 
@@ -196,7 +196,7 @@ static void packet_hdlr(
         pctx->state = ST_CONFIG_2;
         txret = send_spi(pctx);
         if (txret != 0) {
-            edlog(E_WRFPGA);
+            dplog(E_WRFPGA);
             return;
         }
     }
@@ -204,7 +204,7 @@ static void packet_hdlr(
         pctx->state = ST_CONFIG_3;
         txret = send_spi(pctx);
         if (txret != 0) {
-            edlog(E_WRFPGA);
+            dplog(E_WRFPGA);
             return;
         }
     }
@@ -227,7 +227,7 @@ static void packet_hdlr(
  * On dpget, return current configuration to UI.
  **************************************************************/
 static void get_values(
-    int      cmd,      //==EDGET if a read, ==EDSET on write
+    int      cmd,      //==DPGET if a read, ==DPSET on write
     int      rscid,    // ID of resource being accessed
     char    *val,      // new value for the resource
     SLOT    *pslot,    // pointer to slot info.
@@ -243,7 +243,7 @@ static void get_values(
 
     DAC8DEV *pctx = pslot->priv;
 
-    if (cmd == EDSET) {
+    if (cmd == DPSET) {
         if ((sscanf(val, "%d %x\n", &didx, &dval) != 2)
            || (didx < 1) || (didx > NDAC)
            || (dval < 0) || (dval > 0xff)) {
@@ -331,7 +331,7 @@ static int send_spi(
 
     // Start timer to look for a write response.
     if (pctx->ptimer == 0)
-        pctx->ptimer = add_timer(ED_ONESHOT, 100, noAck, (void *) pctx);
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
 
     return txret;
 }
@@ -346,7 +346,7 @@ static void noAck(
     DAC8DEV *pctx)
 {
     // Log the missing ack
-    edlog(E_NOACK);
+    dplog(E_NOACK);
 
     return;
 }
