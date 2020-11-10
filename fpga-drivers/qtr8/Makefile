@@ -19,7 +19,7 @@
 #               in a non-GPLv2 compliant manner.
 #
 
-peripheral_name = qtr4
+peripheral_name = qtr8
 
 INC = ../../include
 LIB = ../../build/lib
@@ -33,7 +33,7 @@ shared_object = $(LIB)/$(peripheral_name).$(SO_EXT)
 
 DEBUG_FLAGS = -g
 RELEASE_FLAGS = -O3
-CFLAGS = -I$(INC) $(DEBUG_FLAGS) -fPIC -c -Wall -DQTR4
+CFLAGS = -I$(INC) $(DEBUG_FLAGS) -fPIC -c -Wall
 
 all: $(shared_object)
 

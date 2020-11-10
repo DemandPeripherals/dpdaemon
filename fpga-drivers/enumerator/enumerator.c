@@ -868,9 +868,8 @@ static void initCore(         // Load and init this core
     char     driverPath[PATH_MAX]; // Has full name of the .so file
     int      islot;    // which dpdaemon slot this core will use
 
-    // Ignore uninitialized cores or cores with a "null" .so file
-    if ((pcore->soname == (char *) 0) ||
-        (strcmp("null", pcore->soname) == 0))
+    // Ignore uninitialized cores
+    if (pcore->soname == (char *) 0)
         return;
 
     strncpy(driverPath, pcore->soname, PATH_MAX - 4);
@@ -886,8 +885,12 @@ static void initCore(         // Load and init this core
         Slots[islot].pcore = (void *) pcore;
         pcore->slot_id = islot;
 
-        // Now call the peripheral intialize function
-        initslot(&(Slots[islot]));   // run the initializer for the slot
+        // Now call the peripheral intialize function.  Null peripherals
+        // take up a slot and 4 pins but do not have drivers.  They are
+        // used to make an 8-pin peripheral use two slots.  Do not try
+        // initialize null peripherals.
+        if (strcmp("null", pcore->soname) != 0)
+            initslot(&(Slots[islot]));   // run the initializer for the slot
     }
 }
 

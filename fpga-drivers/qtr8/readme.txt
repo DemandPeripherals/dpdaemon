@@ -1,7 +1,7 @@
 ============================================================
 
 HARDWARE
-The qtr4 provides four channels of input from a Pololu QTR-RC
+The qtr8 provides eight channels of input from a Pololu QTR-RC
 sensor.  The sensors work by charging a capacitor to Vcc (3.3
 volts in our case) and monitoring the capacitor discharge.  The
 discharge rate depends on the amount of IR light reflected off
@@ -48,8 +48,8 @@ EXAMPLES
 Set the sample rate to 50 milliseconds and the sensitivity to
 mid-range.
 
-  dpset qtr4 update_period 50
-  dpset qtr4 sensitivity 20
-  dpcat qtr4 qtrval
+  dpset qtr8 update_period 50
+  dpset qtr8 sensitivity 20
+  dpcat qtr8 qtrval
 
 

@@ -56,6 +56,7 @@ all:
 	make -C avr all
 	make -C dac8 all
 	make -C qtr4 all
+	make -C qtr8 all
 
 clean:
 	make -C enumerator clean
@@ -92,8 +93,9 @@ clean:
 	make -C rfob clean
 	make -C pwmout4 clean
 	make -C avr clean
+	make -C dac8 clean
 	make -C qtr4 clean
-	make -C qtr4 clean
+	make -C qtr8 clean
 
 install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C enumerator install
@@ -132,6 +134,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 install
 	sudo ldconfig
 
 uninstall:
@@ -171,6 +174,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 uninstall
 	sudo ldconfig
 
 .PHONY : clean install uninstall
