@@ -8,6 +8,7 @@
  *    1: LED1      - LED string #2 hex data
  *    2: LED2      - LED string #3 hex data
  *    3: LED3      - LED string #4 hex data
+ *    3: config    - set LSB to 1 to invert outputs
  * 
  *  Resources:
  *    led : Which string and the hex value to write to that
@@ -17,8 +18,9 @@
  *    parameter is a sequence of hex characters to write to
  *    the string.  The number of hex characters must be even
  *    since LEDs have 3 or 4 bytes of LED data.
+ *    config : A 1 to invert the outputs.  Default is 0.
  *
- * Copyright:   Copyright (C) 2014-2019 Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2014-2020 Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or
@@ -51,9 +53,12 @@
  **************************************************************/
         // WS28 register definitions
 #define WS28_REG_LED0       0x00
+#define WS28_REG_CONF       0x04
 #define FN_LED              "led"
+#define FN_CONF             "config"
         // Resource index numbers
 #define RSC_LED             0
+#define RSC_CONF            1
         // Max data payload size
 #define MXDAT               256
 
@@ -69,6 +74,7 @@ typedef struct
     uint8_t  leddata[MXDAT];  // date to send in packet
     int      string;   // which string (0-3) of last send
     int      count;    // number of bytes in leddata
+    int      invertoutput;  // set to invert output at FPGA
 } WS28DEV;
 
 
@@ -79,6 +85,7 @@ static void packet_hdlr(SLOT *, DP_PKT *, int);
 static void ws28user(int, int, char*, SLOT*, int, int*, char*);
 static void noAck(void *, WS28DEV *);
 static int  ws28tofpga(WS28DEV *);
+static void sendconfigtofpga(WS28DEV *, int *plen, char *buf);
 extern int  dpi_tx_pkt(CORE *pcore, DP_PKT *inpkt, int len);
 
 
@@ -103,6 +110,7 @@ int Initialize(
     pctx->pslot = pslot;       // our instance of a peripheral
     pctx->count = 0;           // no bytes to send yet
     pctx->ptimer = 0;          // set while waiting for a response
+    pctx->invertoutput = 0;    // hardware default is no inversion
 
 
     // Register this slot's packet handler and private data
@@ -116,6 +124,12 @@ int Initialize(
     pslot->rsc[RSC_LED].pgscb = ws28user;
     pslot->rsc[RSC_LED].uilock = -1;
     pslot->rsc[RSC_LED].slot = pslot;
+    pslot->rsc[RSC_CONF].name = FN_CONF;
+    pslot->rsc[RSC_CONF].flags = IS_READABLE | IS_WRITABLE;
+    pslot->rsc[RSC_CONF].bkey = 0;
+    pslot->rsc[RSC_CONF].pgscb = ws28user;
+    pslot->rsc[RSC_CONF].uilock = -1;
+    pslot->rsc[RSC_CONF].slot = pslot;
     pslot->name = "ws28";
     pslot->desc = "Quad WS2812 LED driver";
     pslot->help = README;
@@ -176,13 +190,36 @@ static void ws28user(
     int      hidx;     // index into array of hex values to send
     char     c;        // hex character to convert
     uint8_t  hex;
+    int      invout;   // set == 1 if we're to invert the FPGA output
 
 
     pctx = (WS28DEV *) pslot->priv;
 
-    // only command available is dpset.  Get LED string ID and bytes to send.
-    // Format of val should be something like "2 aabbcc112233".  Scan the
-    // first character, skip white space, then get the hex values.
+    // Look for a config command to set or get the invert output config
+    if ((cmd == DPGET) && (rscid == RSC_CONF)) {
+        // value of 1 or 0
+        ret = snprintf(buf, *plen, "%d\n", pctx->invertoutput);
+        *plen = ret;  // (errors are handled in calling routine)
+        return;
+    }
+    else if ((cmd == DPSET) && (rscid == RSC_CONF)) {
+        // value of 1 or 0
+        ret = sscanf(val, "%d", &invout);
+        if ((ret != 1) || (invout < 0) || (invout > 1)) {
+            ret = snprintf(buf, *plen, E_BDVAL, pslot->rsc[rscid].name);
+            *plen = ret;
+            return;
+        }
+
+        pctx->invertoutput = invout;
+        sendconfigtofpga(pctx, plen, buf);  // send down new config
+        return;
+    }
+
+    // only command still available is dpset on an LED.  Get LED string
+    // ID and bytes to send.  Format of val should be something like
+    // "2 aabbcc112233".  Scan the first character, skip white space,
+    // then get the hex values.
     len = strlen(val);
 
     // get and check string id.  Must be 1 to 4.
@@ -206,7 +243,7 @@ static void ws28user(
         return;
     }
 
-    // Convert string of hex character into upto 256 bytes of data to send
+    // Convert string of hex character into up to 256 bytes of data to send
     hidx = 0;      // init index into array of hex values
     for ( ; i < len; i++) {
         c = val[i++];
@@ -283,6 +320,50 @@ static int ws28tofpga(
 
     return(txret);
 }
+
+
+/**************************************************************
+ * sendconfigtofpga():  - Send invertoutput status to the FPGA. 
+ * Put error messages into buf and update plen.
+ **************************************************************/
+static void sendconfigtofpga(
+    WS28DEV  *pctx,    // This peripheral's context
+    int      *plen,    // size of buf on input, #char in buf on output
+    char     *buf)     // where to store user visible error messages
+{
+    DP_PKT   pkt;      // send write and read cmds to the qtr
+    SLOT    *pslot;    // This peripheral's slot info
+    CORE    *pmycore;  // FPGA peripheral info
+    int      txret;    // ==0 if the packet went out OK
+    int      ret;      // generic return value
+
+    pslot = pctx->pslot;
+    pmycore = pslot->pcore;
+
+    // Write the value the invertoutput in reg #4 bit #0
+    pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
+    pkt.core = pmycore->core_id;
+    pkt.reg = WS28_REG_CONF;      // send invertoutput
+    pkt.count = 1;
+    pkt.data[0] = pctx->invertoutput;
+    txret = dpi_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
+
+    if (txret != 0) {
+        // the send of the new pin values did not succeed.  This
+        // probably means the input buffer to the USB port is full.
+        // Tell the user of the problem.
+        ret = snprintf(buf, *plen, E_WRFPGA);
+        *plen = ret;  // (errors are handled in calling routine)
+        return;
+    }
+
+    // Start timer to look for a write response.
+    if (pctx->ptimer == 0)
+        pctx->ptimer = add_timer(DP_ONESHOT, 100, noAck, (void *) pctx);
+
+    return;
+}
+
 
 
 /**************************************************************
