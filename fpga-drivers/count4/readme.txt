@@ -29,7 +29,7 @@ of count and interval information.  The count output works with
 select().
 
 update_rate : Update period for the counts resource in milliseconds.
-That is, the dpcat command and select() on counts will will give a
+That is, the dpcat command and select() on counts will give a
 readable file descriptor every update_rate milliseconds.  This
 update period must be between 10 and 60 milliseconds in steps
 of 10 milliseconds.   That is, valid values are 10, 20, 30, 40,

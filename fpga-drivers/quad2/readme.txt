@@ -26,7 +26,7 @@ for the second input channel.
 select() to get continuous updates into your program.
 
 update_period : Update period for the counts resource in milliseconds.
-That is, the dpcat command and select() on counts will will give a
+That is, the dpcat command and select() on counts will give a
 readable file descriptor every update_period milliseconds.  Setting
 this to zero turns off all output from the quadrature decoder.
 The update period must be between 0 and 60 milliseconds in steps
