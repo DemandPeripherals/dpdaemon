@@ -97,6 +97,9 @@
 #define TIFMXSTR           20
         // Size of our local FIFO for text and commands
 #define FIFOSZ             120
+        // Contrast control (0/1) may need to change depending
+        // on the LCD you use
+#define CONTRAST_DEF       0x10
 
 
 /**************************************************************
@@ -499,7 +502,7 @@ static void sendtofpga(
     if (rscid == RSC_LEDS) {
         pkt.reg = TIF_R_LED;   // LED
         pkt.count = 1;
-        pkt.data[0] = pctx->leds;
+        pkt.data[0] = pctx->leds | CONTRAST_DEF;
         pktlen = 5;    // 4 header + 1 data
     }
     else if (rscid == RSC_TONE) {
