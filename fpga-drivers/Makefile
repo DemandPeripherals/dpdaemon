@@ -52,6 +52,7 @@ all:
 	make -C stepu all
 	make -C rcrx all
 	make -C rfob all
+	make -C pwmin4 all
 	make -C pwmout4 all
 	make -C avr all
 	make -C dac8 all
@@ -89,6 +90,7 @@ clean:
 	make -C stepu clean
 	make -C rcrx clean
 	make -C rfob clean
+	make -C pwmin4 clean
 	make -C pwmout4 clean
 	make -C avr clean
 	make -C dac8 clean
@@ -126,6 +128,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stepu install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcrx install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C rfob install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmin4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmout4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 install
@@ -164,6 +167,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C stepu uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C rcrx uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C rfob uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmin4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C pwmout4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C avr uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dac8 uninstall
