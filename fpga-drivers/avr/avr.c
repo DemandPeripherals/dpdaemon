@@ -928,7 +928,7 @@ static void errmsg(RSC* prsc, char *errtext)
     char     obuf[MAX_LINE_LEN];
     int      outlen = 0;
 
-    outlen = snprintf(obuf, MAX_LINE_LEN-1, errtext);
+    outlen = snprintf(obuf, MAX_LINE_LEN-1, "%s", errtext);
     send_ui(obuf, outlen, prsc->uilock);
     prompt(prsc->uilock);
     prsc->uilock = -1;   // prompt send, clear lock
