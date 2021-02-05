@@ -49,6 +49,7 @@ int      ntimers = 0;  // number of timers in use
  *  - Forward references
  ***************************************************************************/
 static void      update_fdsets(); // set fd_set before use by select()
+void dplog(char    *format, ...); // printf format string
 struct timeval  *doTimer();
 static long long tv2us(struct timeval *);
 
@@ -57,7 +58,6 @@ extern DP_FD     Dp_Fd[];   // Array of open FDs and callbacks
 extern DP_TIMER  Timers[];  // Array of timers and callbacks
 extern char     *CmdName;
 extern int       UseStderr;
-
 
 
 /***************************************************************************

@@ -88,43 +88,42 @@
 #include <limits.h>              // for PATH_MAX
 #include <termios.h>
 #include <unistd.h>
-#include <sys/ioctl.h> 
+#include <sched.h>              // for sched_yield()
+#include <sys/ioctl.h>
 #include <linux/serial.h>
 #include "daemon.h"
 #include "readme.h"
 
 
-
 /**************************************************************
  *  - Limits and defines
  **************************************************************/
-        // Reg # to read enumerator data from
+// Reg # to read enumerator data from
 #define ENUM_REG_TEXT        0x00
-        // Reg # to write to in order to reset read address counter
+// Reg # to write to in order to reset read address counter
 #define ENUM_REG_RESET       0x00
-        // Maximum number of bytes in the enumerator ROM
+// Maximum number of bytes in the enumerator ROM
 #define EROM_SZ              2048
-        // Number of user visible lines in the ROM
+// Number of user visible lines in the ROM
 #define EROM_LNS             24
 
-typedef enum
-{
+typedef enum {
     STATE_TIMER,       // Waiting for init delay timer to expire
     STATE_READING,     // Reading the ROM and awaiting responses
     STATE_DONE         // Done, become inactive
 } ENUM_STATES;
 
-        // SLIP decoder states
+// SLIP decoder states
 #define AWAITING_PKT  (1)
 #define IN_PACKET     (2)
 #define INESCAPE      (3)
 
-        // resource names and numbers
+// resource names and numbers
 #define FN_PORT            "port"
 #define FN_TEXT            "text"
 #define RSC_PORT           0
 #define RSC_TEXT           1
-        // What we are is a ...
+// What we are is a ...
 #define PLUGIN_NAME        "enumerator"
 
 #define MX_MSGLEN 1000
@@ -133,43 +132,53 @@ typedef enum
 /**************************************************************
  *  - Data structures
  **************************************************************/
-    // All state info for an instance of an enumerator
-typedef struct
-{
-    void    *pslot;            // handle to enumerator's slot info
-    void    *ptimr;            // backup timer handle
-    char     port[PATH_MAX];   // full path to serial port node
-    int      usbFd;            // serial port File Descriptor (=-1 if closed)
-    int      enumstate;        // where we are in the init process
+// All state info for an instance of an enumerator
+typedef struct {
+    void *pslot;            // handle to enumerator's slot info
+    void *ptimr;            // backup timer handle
+    char port[PATH_MAX];   // full path to serial port node
+    int usbFd;            // serial port File Descriptor (=-1 if closed)
+    int enumstate;        // where we are in the init process
     unsigned char slrx[RXBUF_SZ];  // raw received packet from USB port
-    int      slix;             // where in slrx the next byte goes
-    int      romIdx;           // current read location in rom
-    char     rom[EROM_SZ];     // copy of ROM contents on the FPGA
-    CORE     core[NUM_CORE];
+    int slix;             // where in slrx the next byte goes
+    int romIdx;           // current read location in rom
+    char rom[EROM_SZ];     // copy of ROM contents on the FPGA
+    CORE core[NUM_CORE];
 } ENUM;
-
 
 
 /**************************************************************
  *  - Function prototypes and externs
  **************************************************************/
-static void  receivePkt(int fd, void *priv, int rw);
-static void  process_pkt(SLOT *, DP_PKT *, int);
-static int   getSoNames(ENUM *);
-static void  usercmd(int, int, char*, SLOT*, int, int*, char*);
-static int   portsetup(ENUM *pctx);
-static void  InitStep2(void *, void *);
-static int   dptoslip(unsigned char *, int, unsigned char *);
-static void  dispatch_packet(ENUM *pEnum, unsigned char *inbuf, int len);
-static void  initCore(CORE *pcore);
-extern int   dpi_tx_pkt(CORE *pcore, DP_PKT *inpkt, int len);
-extern int   add_so(char *);
-extern void  initslot(SLOT *);
-extern SLOT  Slots[];
-extern int   useStderr;
-extern int   DebugMode;
-extern int   ForegroundMode;
-extern int   Verbosity;
+static void receivePkt(int fd, void *priv, int rw);
+
+static void process_pkt(SLOT *, DP_PKT *, int);
+
+static int getSoNames(ENUM *);
+
+static void usercmd(int, int, char *, SLOT *, int, int *, char *);
+
+static int portsetup(ENUM *pctx);
+
+static void InitStep2(void *, void *);
+
+static int dptoslip(unsigned char *, int, unsigned char *);
+
+static void dispatch_packet(ENUM *pEnum, unsigned char *inbuf, int len);
+
+static void initCore(CORE *pcore);
+
+extern int dpi_tx_pkt(CORE *pcore, DP_PKT *inpkt, int len);
+
+extern int add_so(char *);
+
+extern void initslot(SLOT *);
+
+extern SLOT Slots[];
+extern int useStderr;
+extern int DebugMode;
+extern int ForegroundMode;
+extern int Verbosity;
 extern char *SerialPort;
 extern char *CoreFile;
 
@@ -179,13 +188,11 @@ extern char *CoreFile;
  * the read/write callbacks.
  **************************************************************/
 int Initialize(
-    SLOT *pslot)       // points to the SLOT for this driver
+        SLOT *pslot)       // points to the SLOT for this driver
 {
-    ENUM    *pctx;     // our local port context
-    int      i;        // generic loop counter
-    int      ret;      // generic return value
-    int      fdcore;   // FD to the DPCore file if loaded
-    char     c;        // single byte to send from file to FPGA
+    ENUM *pctx;   // our local port context
+    int ret;      // generic return value
+    int fdcore;   // FD to the DPCore file if loaded
 
     // Allocate memory for this driver
     pctx = (ENUM *) malloc(sizeof(ENUM));
@@ -213,7 +220,7 @@ int Initialize(
     pslot->rsc[RSC_PORT].bkey = 0;
     pslot->rsc[RSC_PORT].pgscb = usercmd;
     pslot->rsc[RSC_PORT].uilock = -1;
-    pslot->rsc[RSC_TEXT].name = FN_TEXT   ;
+    pslot->rsc[RSC_TEXT].name = FN_TEXT;
     pslot->rsc[RSC_TEXT].flags = IS_READABLE;
     pslot->rsc[RSC_TEXT].bkey = 0;
     pslot->rsc[RSC_TEXT].pgscb = usercmd;
@@ -223,23 +230,23 @@ int Initialize(
     pctx->ptimr = (void *) 0;
 
     // init the Core structures
-    for (i = 0; i < NUM_CORE; i++) {
-        pctx->core[i].core_id   = i;
-        pctx->core[i].soname    = (char *) 0;
-        pctx->core[i].penum     = pctx;
-        pctx->core[i].pcb       = (void *) 0;
+    for (int i = 0; i < NUM_CORE; i++) {
+        pctx->core[i].core_id = i;
+        pctx->core[i].soname = (char *) 0;
+        pctx->core[i].penum = pctx;
+        pctx->core[i].pcb = (void *) 0;
     }
 
     // The enumerator can be in any dpdaemon slot but is always
     // in core_id = 0.
-    pctx->core[0].slot_id   = pslot->slot_id;
-    pctx->core[0].soname    = "enumerator.so";
-    pctx->core[0].pcb       = process_pkt;
+    pctx->core[0].slot_id = pslot->slot_id;
+    pctx->core[0].soname = "enumerator.so";
+    pctx->core[0].pcb = process_pkt;
 
     // now open and register the serial port to the FPGA
     ret = portsetup(pctx);
     if (ret < 0) {
-        return(0);           // unable to open the port
+        return (-1);           // fatal : unable to open the port
     }
 
     // If a DPCore.bin file is specified, load it now
@@ -247,18 +254,63 @@ int Initialize(
         fdcore = open(CoreFile, O_RDONLY, 0);
         if (fdcore < 0) {
             dplog(M_NOCORE, CoreFile, strerror(errno));
-            return(0);       // FPGA download failed
+            return (-1);       // FPGA download failed, fatal error!
         }
+
+        // push fpga image to serial at high speed
         // "Cat" the file down the serial port
-        while (1) {
-            ret = read(fdcore, &c, 1);
-            if (ret == 1) {
-                (void) write(pctx->usbFd, &c, 1);
-                continue;
+        const size_t bufsize = 1024;
+        char *buf = malloc(bufsize);
+        if (!buf) {
+            dplog("memory allocation failure.");
+            return (-1); // fatal error!
+        }
+
+        int done = 0; // flag
+        int problem = 0; // flag
+
+        // loop until we are done with the input file
+
+        while (!done) {
+            ssize_t n_recv = read(fdcore, buf, bufsize);
+            if (n_recv == 0) {
+                // eof, OK
+                done = 1;
+            } else if (n_recv < 0) {
+                // bad read, ERR
+                done = 1;
+                problem = 1; // report error
+            } else {
+                // got data, OK
+                ssize_t j = 0; // number of bytes done
+                ssize_t n_to_go = n_recv; // number of bytes to go
+                while (n_to_go > 0) {
+                    // fprintf(stdout, "n_to_go = %zd j=%zd\n", n_to_go, j);
+                    ssize_t n_sent = write(pctx->usbFd, buf + j, n_to_go);
+                    if (n_sent < 0) {
+                        // error or busy
+                        if (errno != EAGAIN) {
+                            done = 1; // no need to continue, fatal error on serial write
+                            problem = 2; // report error
+                            // fprintf(stderr, "sent = %zd", n_sent);
+                        }
+                    } else if (n_sent == 0) {
+                        // busy
+                        sched_yield(); // yield cpu
+                    } else {
+                        // some bytes have been sent, update counters
+                        n_to_go -= n_sent;
+                        j += n_sent;
+                    }
+                }
             }
-            // no characters to get.  Done.
-            close(fdcore);
-            break;
+        }
+        close(fdcore);
+
+        free(buf); // release tmp buf
+        if (problem > 0) {
+            dplog("init failure");
+            return (-1); // failure
         }
     }
 
@@ -274,19 +326,18 @@ int Initialize(
  * usercmd():  - The user is reading or setting a resource
  **************************************************************/
 static void usercmd(
-    int      cmd,      //==DPGET if a read, ==DPSET on write
-    int      rscid,    // ID of resource being accessed
-    char    *val,      // new value for the resource
-    SLOT    *pslot,    // pointer to slot info.
-    int      cn,       // Index into UI table for requesting conn
-    int     *plen,     // size of buf on input, #char in buf on output
-    char    *buf)
-{
-    ENUM    *pctx;     // serial_fpga private info
-    int      ret;      // generic call return value.  Reused.
-    char     etxt[EROM_SZ];  // ROM as text to sent to ui
-    int      i;        // index into rom[] and etxt[]
-    int      l;        // counts lines int etxt
+        int cmd,      //==DPGET if a read, ==DPSET on write
+        int rscid,    // ID of resource being accessed
+        char *val,      // new value for the resource
+        SLOT *pslot,    // pointer to slot info.
+        int cn,       // Index into UI table for requesting conn
+        int *plen,     // size of buf on input, #char in buf on output
+        char *buf) {
+    ENUM *pctx;     // serial_fpga private info
+    int ret;      // generic call return value.  Reused.
+    char etxt[EROM_SZ];  // ROM as text to sent to ui
+    int i;        // index into rom[] and etxt[]
+    int l;        // counts lines int etxt
 
     // Get this instance of the driver
     pctx = (ENUM *) pslot->priv;
@@ -295,12 +346,11 @@ static void usercmd(
     if ((cmd == DPGET) && (rscid == RSC_PORT)) {
         ret = snprintf(buf, *plen, "%s\n", pctx->port);
         *plen = ret;  // (errors are handled in calling routine)
-    }
-    else if ((cmd == DPSET) && (rscid == RSC_PORT)) {
+    } else if ((cmd == DPSET) && (rscid == RSC_PORT)) {
         // Val has the new port path.  Just copy it.
         (void) strncpy(pctx->port, val, PATH_MAX);
         // strncpy() does not force a null.  We add one now as a precaution
-        pctx->port[PATH_MAX -1] = (char) 0;
+        pctx->port[PATH_MAX - 1] = (char) 0;
         // close and unregister the old port
         if (pctx->usbFd >= 0) {
             del_fd(pctx->usbFd);
@@ -317,15 +367,13 @@ static void usercmd(
 
         // add a timer kick off the reading of the ROM
         pctx->ptimr = add_timer(DP_ONESHOT, 10, InitStep2, (void *) pctx);
-    }
-    else if ((cmd == DPGET) && (rscid == RSC_TEXT)) {
+    } else if ((cmd == DPGET) && (rscid == RSC_TEXT)) {
         i = 0;         // index into rom/etxt
         l = 0;         // line count
         while (i < EROM_SZ) {
             if (pctx->rom[i] != (char) 0) {
                 etxt[i] = pctx->rom[i];    // copy character from ROM
-            }
-            else {
+            } else {
                 etxt[i] = '\n';
                 l++;
             }
@@ -350,15 +398,14 @@ static void usercmd(
  * Open the serial port.   Sets pctx->usbFd.
  * Return fd so errors can be handled in calling routine.
  **************************************************************/
-static int portsetup(ENUM *pctx)
-{
+static int portsetup(ENUM *pctx) {
     struct serial_struct serial; // for low latency
     struct termios tbuf;
 
     if (pctx->usbFd < 0) {
         pctx->usbFd = open(pctx->port, (O_RDWR | O_NONBLOCK), 0);
         if (pctx->usbFd < 0) {
-            return(pctx->usbFd);
+            return (pctx->usbFd);
         }
     }
 
@@ -376,7 +423,7 @@ static int portsetup(ENUM *pctx)
     }
 
     // Configure port for low latency
-    ioctl(pctx->usbFd, TIOCGSERIAL, &serial); 
+    ioctl(pctx->usbFd, TIOCGSERIAL, &serial);
     serial.flags |= ASYNC_LOW_LATENCY;
     ioctl(pctx->usbFd, TIOCSSERIAL, &serial);
 
@@ -387,7 +434,7 @@ static int portsetup(ENUM *pctx)
     // to complete the reset.
     sleep(1);
 
-    return(pctx->usbFd);
+    return (pctx->usbFd);
 }
 
 
@@ -400,16 +447,16 @@ static int portsetup(ENUM *pctx)
  *   
  **************************************************************/
 static void process_pkt(
-    SLOT     *pslot,   // handle for our slot's internal info
-    DP_PKT   *pkt,     // the received packet
-    int       len)     // number of bytes in the received packet
+        SLOT *pslot,   // handle for our slot's internal info
+        DP_PKT *pkt,     // the received packet
+        int len)     // number of bytes in the received packet
 {
-    ENUM    *pEnum;    // our local info
-    DP_PKT   readpkt;  // the next read request packet
-    int      stillneeded; // how many bytes are still needed
-    int      i;        // generic loop counter
+    ENUM *pEnum;    // our local info
+    DP_PKT readpkt;  // the next read request packet
+    int stillneeded; // how many bytes are still needed
+    int i;        // generic loop counter
 
-    pEnum = (ENUM *)(pslot->priv); // Our "private" data is an ENUM
+    pEnum = (ENUM *) (pslot->priv); // Our "private" data is an ENUM
 
     // Ignore write response packets
     if (pkt->cmd & DP_CMD_OP_WRITE)
@@ -468,11 +515,11 @@ static void process_pkt(
  * read steps.
  **************************************************************/
 static void InitStep2(
-    void *timer,       // handle for this timer
-    void *priv)        // our private data pointer
+        void *timer,       // handle for this timer
+        void *priv)        // our private data pointer
 {
-    ENUM    *pEnum;    // our local info
-    DP_PKT   pkt;      // send write and read cmds to the enumerator
+    ENUM *pEnum;    // our local info
+    DP_PKT pkt;      // send write and read cmds to the enumerator
 
     pEnum = (ENUM *) priv;
 
@@ -512,11 +559,11 @@ static void InitStep2(
  * getSoNames():  - Get the peripheral driver names from the ROM
  **************************************************************/
 static int getSoNames(
-    ENUM *pEnum)       // Our enum info with ROM image
+        ENUM *pEnum)       // Our enum info with ROM image
 {
-    char    *pc;       // points into the ROM image
-    char    *pend;     // last char in the ROM
-    int      i;
+    char *pc;       // points into the ROM image
+    char *pend;     // last char in the ROM
+    int i;
 
     pc = pEnum->rom;            // Point to start of ROM
     pend = pc + EROM_SZ;
@@ -554,14 +601,14 @@ static int getSoNames(
  *     Return number of bytes sent or -1 on error
  ***************************************************************************/
 int dpi_tx_pkt(
-    CORE    *pcore,    // The fpga core sending the packet
-    DP_PKT  *inpkt,    // The packet to send
-    int      len)      // Number of bytes in the packet
+        CORE *pcore,    // The fpga core sending the packet
+        DP_PKT *inpkt,    // The packet to send
+        int len)      // Number of bytes in the packet
 {
     unsigned char sltx[DP_PKTLEN]; // SLIP encoded packet
-    int      usbfd;    // FD to board's USB serial port
-    int      txcount;  // Length of SLIP encoded packet
-    int      sntcount; // Number of bytes actually sent
+    int usbfd;    // FD to board's USB serial port
+    int txcount;  // Length of SLIP encoded packet
+    int sntcount; // Number of bytes actually sent
 
     // sanity check
     if (len < 4) {
@@ -576,14 +623,14 @@ int dpi_tx_pkt(
     // Note that core is 0 indexed to the peripherals in the FPGA
     // and slot is 0 indexed to the loaded drivers.  They might or
     // might not be equal.
-    inpkt->cmd  = inpkt->cmd | 0xf0;  // helps error checking
+    inpkt->cmd = inpkt->cmd | 0xf0;  // helps error checking
     inpkt->core = inpkt->core | 0xe0;
 
     // Get and check the USB port's FD from the enumerator core info
-    usbfd = ((ENUM *)(pcore->penum))->usbFd;
+    usbfd = ((ENUM *) (pcore->penum))->usbFd;
     if (usbfd == -1) {
         //  not connected to the board.
-        return(-1);
+        return (-1);
     }
 
     // Convert DP pkt to a SLIP encoded packet
@@ -591,7 +638,7 @@ int dpi_tx_pkt(
 
     // print pkts to stdout if debug enabled
     if (DebugMode && (Verbosity == DP_VERB_TRACE)) {
-        int      i;
+        int i;
         printf(">>");
         for (i = 0; i < txcount; i++)
             printf(" %02x", sltx[i]);
@@ -619,12 +666,12 @@ int dpi_tx_pkt(
  *  Return the number of bytes in the new packet
  ***************************************************************************/
 static int dptoslip(
-    unsigned char *dppkt,  // The unencode DP packet (input)
-    int      len,      // Number of bytes in dppkt
-    unsigned char *slppkt) // The SLIP encoded packet (output)
+        unsigned char *dppkt,  // The unencode DP packet (input)
+        int len,      // Number of bytes in dppkt
+        unsigned char *slppkt) // The SLIP encoded packet (output)
 {
-    int      dpix = 0; // Index into the input DP packet
-    int      slix = 0; // Indes into the output SLIP packet
+    int dpix = 0; // Index into the input DP packet
+    int slix = 0; // Indes into the output SLIP packet
 
     // Sanity check on input length
     if (len > DP_PKTLEN)
@@ -639,12 +686,10 @@ static int dptoslip(
         if (dppkt[dpix] == SLIP_END) {
             slppkt[slix++] = SLIP_ESC;
             slppkt[slix++] = INPKT_END;
-        }
-        else if (dppkt[dpix] == SLIP_ESC) {
+        } else if (dppkt[dpix] == SLIP_ESC) {
             slppkt[slix++] = SLIP_ESC;
             slppkt[slix++] = INPKT_ESC;
-        }
-        else {
+        } else {
             slppkt[slix++] = dppkt[dpix];
         }
     }
@@ -661,24 +706,24 @@ static int dptoslip(
  * 
  ***************************************************************************/
 static void receivePkt(
-    int      fd,       // FD of USB port with data to read
-    void    *priv,     // transparent callback data
-    int      rw)       // ==0 on read ready, ==1 on write ready
+        int fd,       // FD of USB port with data to read
+        void *priv,     // transparent callback data
+        int rw)       // ==0 on read ready, ==1 on write ready
 {
-    ENUM    *pEnum;
+    ENUM *pEnum;
     unsigned char dppkt[RXBUF_SZ]; // the SLIP decoded packet
-    int      dpix;     // index into dppkt
+    int dpix;     // index into dppkt
     unsigned char c;   // current char to decode
-    int      slstate;  // current state of the decoder
-    int      rdret;    // read return value
-    int      bufstrt;  // where the current pkt started
-    int      bufend;   // number of bytes to process
-    int      i;        // buffer loop counter
+    int slstate;  // current state of the decoder
+    int rdret;    // read return value
+    int bufstrt;  // where the current pkt started
+    int bufend;   // number of bytes to process
+    int i;        // buffer loop counter
 
     pEnum = (ENUM *) priv;
 
     rdret = read(pEnum->usbFd, &(pEnum->slrx[pEnum->slix]),
-        (RXBUF_SZ - pEnum->slix));
+                 (RXBUF_SZ - pEnum->slix));
 
     // Was there an error or has the port closed on us?
     if (rdret <= 0) {
@@ -728,27 +773,23 @@ static void receivePkt(
                     slstate = AWAITING_PKT;
                     dpix = 0;
                     bufstrt = i; // record start of next packet
-                }
-                else if (c == SLIP_ESC)
+                } else if (c == SLIP_ESC)
                     slstate = INESCAPE;
                 else {
                     // A normal packet byte.  Move it to output packet
                     dppkt[dpix] = c;
                     dpix++;
                 }
-            }
-            else {              // must be INESCAPE
+            } else {              // must be INESCAPE
                 if (c == INPKT_END) {
                     dppkt[dpix] = SLIP_END;
                     dpix++;
                     slstate = IN_PACKET;
-                }
-                else if (c == INPKT_ESC) {
+                } else if (c == INPKT_ESC) {
                     dppkt[dpix] = SLIP_ESC;
                     dpix++;
                     slstate = IN_PACKET;
-                }
-                else {          // Protocol violation.  Report it.
+                } else {          // Protocol violation.  Report it.
                     dplog(M_BADSLIP, pEnum->port);
                     slstate = AWAITING_PKT;
                     dpix = 0;
@@ -757,10 +798,9 @@ static void receivePkt(
         }
         if ((bufend - bufstrt - 1) != 0) {
             (void) memmove(pEnum->slrx, &(pEnum->slrx[bufstrt + 1]),
-                (bufend - bufstrt - 1));
+                           (bufend - bufstrt - 1));
             pEnum->slix = bufend - bufstrt - 1;
-        }
-        else {
+        } else {
             pEnum->slix = 0;
         }
         break;                  // Exit the while loop
@@ -772,17 +812,17 @@ static void receivePkt(
  *  dispatch_packet()  - Verify and route packets to peripheral modules
  ***************************************************************************/
 static void dispatch_packet(
-    ENUM    *pEnum,       // Board sending the packet
-    unsigned char *inbuf, // Points to input packet
-    int      len)         // Length of input packet
+        ENUM *pEnum,       // Board sending the packet
+        unsigned char *inbuf, // Points to input packet
+        int len)         // Length of input packet
 {
-    int      bogus = 0;   // assume it is OK
-    DP_PKT  *ppkt;        // maps char pointer to a DP_PKT
-    int      pktcore;     // source core for the packet
-    int      requested_bytes; // request len and remaining
-    int      returned_bytes;
-    int      remaining_bytes;
-    int      i;
+    int bogus = 0;   // assume it is OK
+    DP_PKT *ppkt;        // maps char pointer to a DP_PKT
+    int pktcore;     // source core for the packet
+    int requested_bytes; // request len and remaining
+    int returned_bytes;
+    int remaining_bytes;
+    int i;
 
     ppkt = (DP_PKT *) inbuf;
     pktcore = ppkt->core & 0x0f;   // mask high four bits of address
@@ -795,22 +835,22 @@ static void dispatch_packet(
         bogus = 1;
     }
 
-    // Cmd has to be either a read or a write response
+        // Cmd has to be either a read or a write response
     else if ((ppkt->cmd & DP_CMD_OP_MASK) == 0) {
         bogus = 2;
     }
 
-    // Verify core is in a valid range
+        // Verify core is in a valid range
     else if (pktcore >= NUM_CORE) {
         bogus = 3;
     }
 
-    // Verify word size, request count, remaining count and len are OK
-    // for reads
+        // Verify word size, request count, remaining count and len are OK
+        // for reads
     else if (ppkt->cmd & DP_CMD_OP_READ) {
         requested_bytes = ppkt->count;
         returned_bytes = len - 5; // four header bytes & remaining
-                                  // count
+        // count
         // Difference between requested and returned should be in
         // remaining
         remaining_bytes = (int) inbuf[len - 1];
@@ -819,7 +859,7 @@ static void dispatch_packet(
         }
     }
 
-    if (bogus != 0)  {
+    if (bogus != 0) {
         dplog(M_BADPKT, pEnum->port);
         if (DebugMode && (Verbosity == DP_VERB_TRACE)) {
             printf("<X");
@@ -841,12 +881,11 @@ static void dispatch_packet(
     // Packet looks OK, dispatch it to the driver if core
     // has registered a received packet callback
     if (pEnum->core[pktcore].pcb) {
-        (pEnum->core[pktcore].pcb) (
-          &(Slots[pEnum->core[pktcore].slot_id]),  // slot pointer
-            ppkt,               // the received packet
-            len);               // num bytes in packet
-    }
-    else {
+        (pEnum->core[pktcore].pcb)(
+                &(Slots[pEnum->core[pktcore].slot_id]),  // slot pointer
+                ppkt,               // the received packet
+                len);               // num bytes in packet
+    } else {
         // There is no driver for this core and this is an error.
         // However, this is common during start-up since packets can
         // arrive from the FPGA before we've had a chance to register
@@ -854,7 +893,8 @@ static void dispatch_packet(
         // startup by looking to see if enumerator packet handler is
         // registered.
         if (pEnum->core[0].pcb == NULL) {
-            dplog(M_NOSO, pEnum->core[pktcore].core_id, pEnum->port); }
+            dplog(M_NOSO, pEnum->core[pktcore].core_id, pEnum->port);
+        }
     }
 }
 
@@ -863,10 +903,9 @@ static void dispatch_packet(
  *  initCore()  - Load .so file and call init function for it
  ***************************************************************************/
 static void initCore(         // Load and init this core
-    CORE    *pcore)
-{
-    char     driverPath[PATH_MAX]; // Has full name of the .so file
-    int      islot;    // which dpdaemon slot this core will use
+        CORE *pcore) {
+    char driverPath[PATH_MAX]; // Has full name of the .so file
+    int islot;    // which dpdaemon slot this core will use
 
     // Ignore uninitialized cores
     if (pcore->soname == (char *) 0)
@@ -875,7 +914,7 @@ static void initCore(         // Load and init this core
     strncpy(driverPath, pcore->soname, PATH_MAX - 4);
     strcat(driverPath, ".so");
 
-    islot  = add_so(driverPath);
+    islot = add_so(driverPath);
     if (islot >= 0) {
         // We pass to the new peripheral a CORE structure that has its
         // position in the FPGA as well as which enumerator (serial port)
