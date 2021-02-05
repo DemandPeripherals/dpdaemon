@@ -285,14 +285,14 @@ int Initialize(
                 ssize_t j = 0; // number of bytes done
                 ssize_t n_to_go = n_recv; // number of bytes to go
                 while (n_to_go > 0) {
-                    // fprintf(stdout, "n_to_go = %zd j=%zd\n", n_to_go, j);
                     ssize_t n_sent = write(pctx->usbFd, buf + j, n_to_go);
                     if (n_sent < 0) {
                         // error or busy
                         if (errno != EAGAIN) {
                             done = 1; // no need to continue, fatal error on serial write
                             problem = 2; // report error
-                            // fprintf(stderr, "sent = %zd", n_sent);
+                        } else {
+                            sched_yield(); // yield cpu
                         }
                     } else if (n_sent == 0) {
                         // busy
