@@ -42,13 +42,13 @@
  ***************************************************************************/
 int      nui = 0;              // number of open UI connections
 int      srvfd;                // FD to the listening socket
-char     prmpchar[] = { PROMPT, 0 };
+char     prmpchar[] = { PROMPT, 0 }; // string prompt
 
 
 /***************************************************************************
  *  - Function prototypes, forward references, and externs
  ***************************************************************************/
-void            open_ui_port();
+int             open_ui_port();
 int             add_so(char *);
 void            initslot(SLOT *);  // Load and init this slot
 static void     open_ui_conn(int srvfd, int cb_data);
@@ -351,6 +351,8 @@ void parse_and_execute(UI *pui)
  * have a matching monitor key.  Clear the key if there are no UIs
  * monitoring this resource any more.  Close UI sessions that fail
  * the write.
+ * This routine has a serious problem :
+ * if one of the receiver clients stays busy, all others will block !
  ***************************************************************************/
 void bcst_ui(
     char    *buf,         // buffer of chars to send
@@ -381,13 +383,22 @@ void bcst_ui(
         nwr = 0;
         while (nwr != len) {
             ret = write(pui->fd, buf, len);
-            if (ret <= 0) {
-                if (errno != EAGAIN)
-                    continue;
+            if (ret < 0) {
+                if (errno == EAGAIN) {
+                    continue; // try again, maybe we should skip to next client???
+                } else {
+                    // error, close connection
+                    close_ui_conn(cn);
+                    break; // done with message
+                }
+            } else if (ret == 0) {
+                // EOF, close connection
                 close_ui_conn(cn);
-                break;
+                break; // done with message
+            } else {
+                // message partly written, update index
+                nwr += ret;
             }
-            nwr += ret;
         }
     }
 
@@ -424,7 +435,7 @@ void send_ui(
     while (len) {
         nwr = write(UiCons[cn].fd, buf, len);
         if (nwr <= 0) {
-            if (errno != EAGAIN)
+            if (errno == EAGAIN) // logic was inverted EvdO
                 continue;
             close_ui_conn(cn);
             return;
@@ -444,21 +455,24 @@ void send_ui(
 void prompt(
     int      cn)          // index to UI conn table
 {
-    int      nwr=0;       // number of bytes written
+    int len = 0;  // message length
+    int nwr = 0 ; // number of bytes written
 
     /* Sanity checks */
     if ((cn < 0) || (cn >= MX_UI) || (UiCons[cn].fd < 0)) {
         return;   // nothing to do or bogus request
     }
 
-    while (nwr != 1) {
-        nwr = write(UiCons[cn].fd, prmpchar, 1);
+    len = 1; // one character for prompt
+    while (len) {
+        nwr = write(UiCons[cn].fd, prmpchar, len);
         if (nwr <= 0) {
-            if (errno != EAGAIN)
+            if (errno == EAGAIN) // logic was inverted EvdO
                 continue;
             close_ui_conn(cn);
             return;
         }
+        len -= nwr;
     }
     return;
 }
@@ -484,7 +498,7 @@ void receive_ui(int fd_in, int cb_data)
     /* Locate the UI struct with fd equal to fd_in */
     for (cn = 0 ; cn < MX_UI; cn++) {
         if (fd_in == UiCons[cn].fd) {
-            break;
+            break; // match found
         }
     }
     /* Error if we could not find the fd */
@@ -494,6 +508,7 @@ void receive_ui(int fd_in, int cb_data)
         close(fd_in);
         return;
     }
+
     pui = &(UiCons[cn]);
 
     /* We read data from the connection into the buffer in the ui struct. Once
@@ -502,10 +517,22 @@ void receive_ui(int fd_in, int cb_data)
     nrd = read(pui->fd, &(pui->cmd[pui->cmdindx]), (MXCMD - pui->cmdindx));
 
     /* shutdown manager conn on error or on zero bytes read */
-    if ((nrd <= 0) && (errno != EAGAIN)) {
+    if (nrd < 0) {
+        if (errno == EAGAIN) {
+            // try again later
+            return;
+        } else {
+            // real error
+            close_ui_conn(cn);
+            return;
+        }
+    } else if (nrd == 0) {
+        // EOF
         close_ui_conn(cn);
         return;
     }
+
+    // we have read some data
 
     pui->cmdindx += nrd;
 
@@ -569,7 +596,6 @@ void open_ui_conn(int srvfd, int cb_data)
         return;
     }
     nui++;       /* increment number of UI structs alloc'ed */
-    listen(srvfd, MX_UI - nui);  //  lower the number of avail conns
 
     /* OK, we've got the UI struct.  Fill it in.    */
     UiCons[i].fd = newuifd;
@@ -602,7 +628,7 @@ void close_ui_conn(int cn)
     del_fd(UiCons[cn].fd);
     UiCons[cn].fd = -1;
     nui--;
-    listen(srvfd, MX_UI - nui);  //  lower the number of avail conns
+
     return;
 }
 
@@ -613,39 +639,58 @@ void close_ui_conn(int cn)
  *
  * Input:        int ui_port
  *               char *ui_addr;  the IP address to bind to
- * Output:       none
+ * Output:       error status ( 0 == OK )
  * Effects:      select listen table
  ***************************************************************************/
-void open_ui_port()
+int open_ui_port()
 {
-    struct sockaddr_in srvskt;
-    int      adrlen;
-    int      flags;
+    struct sockaddr_in srvskt = { 0, }; // create and clean
+    int      flags; // for socket options
 
-    adrlen = sizeof(struct sockaddr_in);
-    (void) memset((void *) &srvskt, 0, (size_t) adrlen);
     srvskt.sin_family = AF_INET;
     srvskt.sin_addr.s_addr = (UiaddrAny) ? htonl(INADDR_ANY) : htonl(INADDR_LOOPBACK);
     srvskt.sin_port = htons(UiPort);
+
+    // make server socket
     if ((srvfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0) {
+        perror("can not create socket");
         dplog(M_BADCONN, errno);
-        return;
+        return -1;
     }
+
+    // prevent time_wait issues on quick restart of daemon
+    flags = 1; // set socket option ON == 1
+    if (setsockopt(srvfd, SOL_SOCKET, SO_REUSEADDR, &flags, sizeof(flags)) < 0) {
+        perror("can not set socket option");
+        // could not set socket option, bad stuff
+        dplog(M_BADCONN, errno);
+        return -4;
+    }
+
+    // set socket NON blocking
     flags = fcntl(srvfd, F_GETFL, 0);
     flags |= O_NONBLOCK;
     (void) fcntl(srvfd, F_SETFL, flags);
-    if (bind(srvfd, (struct sockaddr *) &srvskt, adrlen) < 0) {
+
+    // bind socket
+    if (bind(srvfd, (struct sockaddr *) &srvskt, sizeof(srvskt)) < 0) {
+        perror("can not bind socket");
         dplog(M_BADCONN, errno);
-        return;
+        return -2 ;
     }
-    if (listen(srvfd, MX_UI - nui) < 0) {
+
+    // listen on socket
+    if (listen(srvfd, MX_UI) < 0) {
+        perror("can not listen() socket");
         dplog(M_BADCONN, errno);
-        return;
+        return -3 ;
     }
 
     /* If we get to here, then we were able to open the UI socket. Tell the
      * select loop about it. */
     add_fd(srvfd, DP_READ, open_ui_conn, (void *) 0);
+
+    return 0; // OK
 }
 
 /***************************************************************************

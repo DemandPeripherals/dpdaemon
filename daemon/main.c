@@ -78,7 +78,7 @@ static void globalinit();
 static void daemonize();
 static void invokerealtimeextensions();
 static void processcmdline(int, char *[]);
-extern void open_ui_port();
+extern int open_ui_port();
 extern void muxmain();
 extern void initslot(SLOT *);  // Load and init this slot
 extern int  add_so(char *);
@@ -165,8 +165,13 @@ int main(int argc, char *argv[])
     }
 
     // Open the TCP listen port for UI connections
-    open_ui_port();
+    int error = open_ui_port();
 
+    // network setup failed, we can not continue
+    if (error) {
+        // we bail out
+        exit(-1);
+    }
     // Drop into the select loop and wait for events
     muxmain();
 

@@ -539,6 +539,7 @@ static int irc_command(
             // indicates a full socket buffer and a communication problem.
             // Not strictly needed but we error out and retry the conn
             dplog("Partial write in IRCCOM.  Retrying connection");
+            // EvdO TEXT WRONG : WE CAN NOT GET HERE ON PARTIAL WRITE ONLY ON ERROR
         }
 
         // Getting here means there was a error.  Shutdown and start a

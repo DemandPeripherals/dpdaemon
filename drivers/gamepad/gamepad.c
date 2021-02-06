@@ -288,7 +288,7 @@ static void getevents(
     nrd = read(pctx->gpfd, &(pctx->gpevt[cindx]), (EVENTSZ - cindx));
 
     // shutdown manager conn on error or on zero bytes read */
-    if ((nrd <= 0) && (errno != EAGAIN)) {
+    if ((nrd <= 0) && (errno != EAGAIN)) { // EvdO checked
         close(pctx->gpfd);
         del_fd(pctx->gpfd);
         pctx->gpfd = -1;

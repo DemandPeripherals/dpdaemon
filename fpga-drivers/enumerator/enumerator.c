@@ -405,6 +405,7 @@ static int portsetup(ENUM *pctx) {
     if (pctx->usbFd < 0) {
         pctx->usbFd = open(pctx->port, (O_RDWR | O_NONBLOCK), 0);
         if (pctx->usbFd < 0) {
+            perror("Can not open Serial port");
             return (pctx->usbFd);
         }
     }
@@ -715,24 +716,28 @@ static void receivePkt(
     int dpix;     // index into dppkt
     unsigned char c;   // current char to decode
     int slstate;  // current state of the decoder
-    int rdret;    // read return value
+    int n_read;    // read return value
     int bufstrt;  // where the current pkt started
     int bufend;   // number of bytes to process
     int i;        // buffer loop counter
 
     pEnum = (ENUM *) priv;
 
-    rdret = read(pEnum->usbFd, &(pEnum->slrx[pEnum->slix]),
-                 (RXBUF_SZ - pEnum->slix));
+    n_read = read(pEnum->usbFd, &(pEnum->slrx[pEnum->slix]), (RXBUF_SZ - pEnum->slix));
 
     // Was there an error or has the port closed on us?
-    if (rdret <= 0) {
-        if ((errno != EAGAIN) || (rdret == 0)) {
+    if (n_read < 0) {
+        // closed on us or busy
+        if (errno == EAGAIN) {
+            return; // busy is not fatal
+        } else {
+            // closed, error occurred
             dplog(M_NOREAD, pEnum->port);
-            exit(-1);
+            exit(-1); // we really want to kill the program, not sure about that
         }
-        // EAGAIN means it's recoverable and we just try again later
-        return;
+    } else if (n_read == 0) {
+        // no more data, no error
+        return; // try later
     }
 
     // At this point we have read some bytes from the USB port.  We
@@ -750,7 +755,7 @@ static void receivePkt(
 
     slstate = AWAITING_PKT;
     bufstrt = 0;
-    bufend = pEnum->slix + rdret;
+    bufend = pEnum->slix + n_read;
 
     // Drop into a loop to process all the packets in the buffer
     while (1) {

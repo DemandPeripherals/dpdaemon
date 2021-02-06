@@ -39,9 +39,9 @@
 /**************************************************************
  *  - Limits and defines
  **************************************************************/
-        // Maximum length of an IP address string
+// Maximum length of an IP address string
 #define MAX_IP       50
-        // Max length of cmd down to the dp daemon
+// Max length of cmd down to the dp daemon
 #define MAX_DPCMD   250
 
 
@@ -49,15 +49,15 @@
  *  - Function prototypes and forward references
  **************************************************************/
 void usage();
+
 void help(char **);
+
 char usagetext[];
 char helpget[];
 char helpset[];
 char helpcat[];
 char helploadso[];
 char helplist[];
-
-
 
 
 /**************************************************************
@@ -67,24 +67,23 @@ char helplist[];
  * Input:        argc, argv
  * Output:       0 on normal exit, -1 on error exit with errno set
  **************************************************************/
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     char bindaddress[MAX_IP]; // destination IP address as a string
-    int  bindport;          // TCP port to the DP daemon
-    int  cmdc;              // command line character option
-    int  tmp_int;           // a temporary integer
+    int bindport;          // TCP port to the DP daemon
+    int cmdc;              // command line character option
+    int tmp_int;           // a temporary integer
     static int srvfd = -1;  // FD for DP daemon socket
     struct sockaddr_in skt; // network address for DP daemon
-    int  adrlen;
-    int  i;                 // generic loop counter
-    int  ret;               // generic return value
+    int adrlen;
+    int i;                 // generic loop counter
+    int ret;               // generic return value
     char buf[MAX_DPCMD];    // command to send to daemon
-    int  slen;              // length of string in buf
-    int  nout;              // num chars written to DP daemon
+    int slen;              // length of string in buf
+    int nout;              // num chars written to DP daemon
     char c;                 // response character from DP daemon
 
     // Set default config.  Change default behavior here.
-    strncpy(bindaddress, "127.0.0.1", MAX_IP-1);
+    strncpy(bindaddress, "127.0.0.1", MAX_IP - 1);
     bindport = DEF_UIPORT;
 
 
@@ -106,25 +105,25 @@ int main(int argc, char **argv)
     optarg = argv[0];
     while ((cmdc = getopt(argc, argv, "a:hp:")) != EOF) {
         switch ((char) cmdc) {
-        case 'a':       // Bind Address
-            strncpy(bindaddress, optarg, MAX_IP);
-            break;
+            case 'a':       // Bind Address
+                strncpy(bindaddress, optarg, MAX_IP);
+                break;
 
-        case 'h':       // Help text
-            help(argv);
-            exit(0);
-            break;
+            case 'h':       // Help text
+                help(argv);
+                exit(0);
+                break;
 
-        case 'p':       // Bind Port
-            if (sscanf(optarg, "%d", &tmp_int)) {
-                bindport = tmp_int;
-            }
-            break;
+            case 'p':       // Bind Port
+                if (sscanf(optarg, "%d", &tmp_int)) {
+                    bindport = tmp_int;
+                }
+                break;
 
-        default:
-            usage();
-            exit(-1);
-            break;
+            default:
+                usage();
+                exit(-1);
+                break;
         }
     }
 
@@ -146,27 +145,33 @@ int main(int argc, char **argv)
     // argv[0], that is, how this program was invoked.  Note
     // also that we start at optind, after all cmd parms.
     slen = sprintf(buf, "%s ", argv[0]);
-    for (i = optind; (i < argc && slen < MAX_DPCMD -1) ; i++) {
+    for (i = optind; (i < argc && slen < MAX_DPCMD - 1); i++) {
         slen += snprintf(&(buf[slen]), (MAX_DPCMD - slen), "%s ", argv[i]);
     }
-    if (slen >= MAX_DPCMD -1) {
+    if (slen >= MAX_DPCMD - 1) {
         printf("Error: command exceeds maximum length of %d\n", MAX_DPCMD);
         exit(-1);
     }
     // replace trailing space of last param with a newline
-    buf[slen-1] = '\n';
+    buf[slen - 1] = '\n';
 
     // write complete command to the DP daemon
     nout = 0;
     while (nout != slen) {
-        ret = write(srvfd, &(buf[nout]), (slen - nout));
-        if ((ret < 0) && (errno == EAGAIN))
-            continue;
-        else if (ret <= 0) {
-            printf("Error writing to dpdaemon\n");
-            exit(-1);
+        ret = write(srvfd, (buf + nout), (slen - nout));
+        if (ret < 0) {
+            if (errno == EAGAIN) {
+                // try later
+                continue;
+            } else {
+                // error writing
+                printf("Error writing to dpdaemon\n");
+                exit(-1);
+            }
+        } else {
+            // no error, keep writing
+            nout += ret;
         }
-        nout += ret;
     }
 
     // Command is sent, now print the response if any.
@@ -174,32 +179,50 @@ int main(int argc, char **argv)
     // character as a prompt.  Exit this program when we see
     // a prompt character.  This means that if invoked as a
     // dpcat command you will need to use ^C to exit.
-    while(1) {
+
+    int exit_code = 0; // exit() value to OS
+
+    while (1) {
         // character at a time so this won't be very efficient
         ret = read(srvfd, &c, 1);
-        if ((c == PROMPT) || (ret == 0)) {
-            exit(0);
+
+        // what did we get
+        if (ret < 0) {
+            if (errno == EAGAIN) {
+                continue; // try again later
+            } else {
+                // real error
+                printf("\nError reading from dpdaemon connection\n");
+                exit_code = -1;
+                break; // we are DONE
+            }
+        } else if (ret == 0) {
+            // EOF.
+            exit_code = 0;
+            break; // we are DONE
+        } else {
+            // got some data, check for prompt character
+            if (c == PROMPT) {
+                // this signals the end of message
+                exit_code = 0;
+                break; // we are DONE
+            } else {
+                // this is a message char, show it
+                putchar(c);
+            }
         }
-        else if ((ret < 0) && (errno != EAGAIN)) {
-            printf("\nError reading from dpdaemon connection\n");
-            exit(-1);
-        }
-        if (errno == EAGAIN) {
-            continue;
-        }
-        // Just a character to pass to the user
-        putchar(c);
     }
 
-    exit(0);
+    // we need to close the socket and return
+    close(srvfd); // close
+    exit(exit_code); // end program
 }
 
 
 /**************************************************************
  * usage():  Print command syntax
  **************************************************************/
-void usage()
-{
+void usage() {
     printf(usagetext, CPREFIX, CPREFIX, CPREFIX, CPREFIX, CPREFIX);
 
     return;
@@ -209,8 +232,7 @@ void usage()
 /**************************************************************
  * help():  Print useful help text based on invocation
  **************************************************************/
-void help(char **argv)
-{
+void help(char **argv) {
     // print help based on how/which command was invoked
     if (!strcmp(CPREFIX "list", argv[0]))
         printf(helplist, CPREFIX, CPREFIX, CPREFIX);

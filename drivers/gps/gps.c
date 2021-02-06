@@ -275,7 +275,7 @@ void gpscb(
     ret = read(fd, &(pctx->linein[pctx->ininx]), (GPS_STR_LEN - pctx->ininx));
     // error out with a log message if read error
     if (ret == -1) {
-        if (errno == EAGAIN)
+        if (errno == EAGAIN) // EvdO checked
             return;                  // to be immediately called again
         del_fd(fd);
         pctx->gpsfd = -1;
