@@ -3,7 +3,7 @@
  * 
  * Description: This is the entry point for dpdaemon
  * 
- * Copyright:   Copyright (C) 2019 by Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2021 by Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or
@@ -63,12 +63,12 @@
 #include <sys/fcntl.h>
 #include <sys/time.h>
 #include <sys/mman.h>
+#include <locale.h>
 #include "main.h"
 
 /***************************************************************************
  *  - Limits and defines
  ***************************************************************************/
-#define DPCOREFILE "/usr/local/lib/db/DPCore.bin"
 
 
 /***************************************************************************
@@ -138,6 +138,9 @@ int main(int argc, char *argv[])
     // Ignore the SIGPIPE signal since that can occur if a
     // UI socket closes just before we try to write to it.
     (void) signal(SIGPIPE, SIG_IGN);
+
+    // Set Locale so sscanf() is consistent.
+    setlocale(LC_NUMERIC, "C");
 
     // Initialize globals for slots, timers, ui connections, and select fds
     globalinit();

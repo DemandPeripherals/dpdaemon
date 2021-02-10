@@ -247,7 +247,7 @@ int Initialize(
         fdcore = open(CoreFile, O_RDONLY, 0);
         if (fdcore < 0) {
             dplog(M_NOCORE, CoreFile, strerror(errno));
-            return(0);       // FPGA download failed
+            exit(-1);        // FPGA download failed
         }
         // "Cat" the file down the serial port
         while (1) {

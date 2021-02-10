@@ -535,11 +535,12 @@ static int irc_command(
                 (void) snprintf(tmpbuf, MX_LINE, "%s", strerror(errno));
                 dplog(tmpbuf);
             }
-            // else must be a partial write.  A partial write usually
-            // indicates a full socket buffer and a communication problem.
-            // Not strictly needed but we error out and retry the conn
-            dplog("Partial write in IRCCOM.  Retrying connection");
         }
+
+        // else must be a partial write.  A partial write usually
+        // indicates a full socket buffer and a communication problem.
+        // Not strictly needed but we error out and retry the conn
+        dplog("Partial write in IRCCOM.  Retrying connection");
 
         // Getting here means there was a error.  Shutdown and start a
         // timer to retry the connection

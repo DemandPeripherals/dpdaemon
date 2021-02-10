@@ -161,12 +161,12 @@ int main(int argc, char **argv)
     while (nout != slen) {
         ret = write(srvfd, &(buf[nout]), (slen - nout));
         if ((ret < 0) && (errno == EAGAIN))
-            continue;
+            continue;    // Recoverable error, try again
         else if (ret <= 0) {
             printf("Error writing to dpdaemon\n");
             exit(-1);
         }
-        nout += ret;
+        nout += ret;     // characters successfully written
     }
 
     // Command is sent, now print the response if any.

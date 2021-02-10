@@ -35,10 +35,10 @@ CFLAGS += -D CPREFIX="\"$(CPREFIX)"\" -D DEF_UIPORT=$(DEF_UIPORT)
 all: $(CPREFIX)daemon $(CPREFIX)cli
 
 $(CPREFIX)daemon : $(objects)
-	$(CC) -o $(BIN)/$@ $(objects) -rdynamic -ldl
+	$(CC) $(DEBUG_FLAGS) -o $(BIN)/$@ $(objects) -rdynamic -ldl
 
 $(CPREFIX)cli : $(edcliobjects)
-	$(CC) -o $(BIN)/$@ $(edcliobjects)
+	$(CC) $(DEBUG_FLAGS) -o $(BIN)/$@ $(edcliobjects)
 
 $(OBJ)/%.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $^
