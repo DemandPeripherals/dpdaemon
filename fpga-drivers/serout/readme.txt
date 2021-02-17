@@ -34,8 +34,8 @@ EXAMPLES
    Set the baud rate to 19200 with two stop bits.  Send 'hello
 world' followed by a carriage return and newline to port 1.
          dpset serout4 config 19200 2
-         dpset text hello world
-         dpset hex 0d 0a
+         dpset serout4 text 1 hello world
+         dpset serout4 hex 1 0d 0a
 
 
 NOTES
