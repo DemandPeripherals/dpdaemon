@@ -193,6 +193,7 @@ void prompt(
 #define E_NREAD   "ERROR 006 : Resource '%s' is not readable\n"
 #define E_NWRITE  "ERROR 007 : Resource '%s' is not writable\n"
 #define E_BDVAL   "ERROR 008 : Invalid value given for resource '%s'\n"
+#define E_NBUFF   "ERROR 009 : Would overflow buffer for resource '%s'\n"
 #define LISTFORMAT "  %2d / %10s   %s\n"
 #define LISTRSCFMT "                  - %s : %s%s%s\n"
 
