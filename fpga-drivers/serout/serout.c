@@ -94,7 +94,9 @@
         // Highest baudrate possible
 #define BAUDZERO           38400
         // MS timeout for resending chars on a full peripheral buffer
-#define SORETRYTIME        10
+        // This is for 38400 and is scaled up for lower baud rates to
+        // prevent repeatedly trying to add one character to the buffer.
+#define SORETRYTIME        8
         // FPGA FIFO size is set by `LB2BUFSZ in the .v file.  A value
         // 5 means that the FPGA fifo has 32 bytes.  We use this to limit
         // how full the packets we send to the FPGA.  Change this value
@@ -215,7 +217,8 @@ static void packet_hdlr(
     SODEV  *pctx;      // our local context
     int     fifoidx;   // which fifo is ACKing
     int     scount;    // number of chars ACKed
-    int     nchar;     // number of character in the fifo 
+    int     nchar;     // number of character in the fifo
+    int     retryms;   // retry time in milliseconds
 
     /* We expect one kind of packet from the host:
      * - write response: to acknowledge write to one of the FIFOs.
@@ -272,7 +275,10 @@ static void packet_hdlr(
     if ( pctx->fifo[fifoidx].nxrd != pctx->fifo[fifoidx].nxwrt) {
         // only set the timer if one is not already set
         if (pctx->pxmittmr == 0) {
-            pctx->pxmittmr = add_timer(DP_ONESHOT, SORETRYTIME, serxmit, (void *) pctx);
+            // slow retry for slow links.  Recall baud is one of 0,1,3,7,f for
+            // rates of 38400, 19200, 9600, 4800, and 2400.
+            retryms = SORETRYTIME * (pctx->baud + 1);
+            pctx->pxmittmr = add_timer(DP_ONESHOT, retryms, serxmit, (void *) pctx);
         }
     }
 
