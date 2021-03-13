@@ -363,7 +363,7 @@ static int portsetup(ENUM *pctx)
     }
 
     // port is open and can be configured
-    tbuf.c_cflag = CS8 | CREAD | B115200 | CLOCAL;
+    tbuf.c_cflag = CS8 | CREAD | CLOCAL;
     tbuf.c_iflag = IGNBRK;
     tbuf.c_oflag = 0;
     tbuf.c_lflag = 0;
@@ -488,7 +488,6 @@ static void InitStep2(
     pkt.data[0] = 0;            // a write of any data will do
     // Ignore sending status.  Failures are caught by the backup timer
     (void) dpi_tx_pkt(&(pEnum->core[0]), &pkt, 5);
-
     // Send a read request asking for 255 bytes.
     pkt.cmd = DP_CMD_OP_READ | DP_CMD_NOAUTOINC;
     pkt.core = 0xe0;
@@ -671,8 +670,6 @@ static void receivePkt(
     unsigned char c;   // current char to decode
     int      slstate;  // current state of the decoder
     int      rdret;    // read return value
-    int      bufstrt;  // where the current pkt started
-    int      bufend;   // number of bytes to process
     int      i;        // buffer loop counter
 
     pEnum = (ENUM *) priv;
@@ -689,8 +686,10 @@ static void receivePkt(
         // EAGAIN means it's recoverable and we just try again later
         return;
     }
+    pEnum->slix += rdret;
 
-    // At this point we have read some bytes from the USB port.  We
+
+    // At this point we have read some bytes from the host port.  We
     // now scan those bytes looking for SLIP packets.  We put any
     // packets we find into the dppkt buffer and then dispatch the
     // completed packet to the packet handler which routes the packet
@@ -702,66 +701,63 @@ static void receivePkt(
     // move the bytes of the partial packet to the start of the buffer.
     // This way we can always start the SLIP processing at the start 
     // of the buffer.  
-
-    slstate = AWAITING_PKT;
-    bufstrt = 0;
-    bufend = pEnum->slix + rdret;
-
     // Drop into a loop to process all the packets in the buffer
     while (1) {
         dpix = 0;               // at start of a new decoded packet
-        for (i = bufstrt; i < bufend; i++) {
+        slstate = AWAITING_PKT;
+        for (i = 0; i < pEnum->slix; i++) {
             c = pEnum->slrx[i];
 
-            // Packets start with the first non-SLIP_END character
-            if (slstate == AWAITING_PKT) {
-                if (c == SLIP_END)
+            if (c == SLIP_END) {
+                if (slstate == AWAITING_PKT) {
+                    slstate = IN_PACKET;
                     continue;
-                else
-                    slstate = IN_PACKET; // now in a packet
-            }
-
-            if (slstate == IN_PACKET) {
-                if (c == SLIP_END) {
-                    // Process packet and set up for next one
-                    dispatch_packet(pEnum, dppkt, dpix);
-                    slstate = AWAITING_PKT;
-                    dpix = 0;
-                    bufstrt = i; // record start of next packet
                 }
-                else if (c == SLIP_ESC)
+                else if (slstate == IN_PACKET) {
+                    // Process completed packet and set up for next one
+                    dispatch_packet(pEnum, dppkt, dpix);
+                    // return if no more bytes in buffer
+                    if ((i - 1) == pEnum->slix) {
+                        pEnum->slix = 0;
+                        return;
+                    }
+                    // else move remaining bytes in buffer down and scan again
+                    (void) memmove(pEnum->slrx, &(pEnum->slrx[i + 1]), (pEnum->slix - i - 1));
+                    pEnum->slix = pEnum->slix - i - 1;
+                    slstate = IN_PACKET;
+                    dpix = 0;
+                    i = 0;      // scan again from start of buffer
+                }
+            }
+            else if (c == SLIP_ESC) {
+                // this should only occur while IN_PACKET
+                if (slstate == IN_PACKET)
                     slstate = INESCAPE;
                 else {
-                    // A normal packet byte.  Move it to output packet
-                    dppkt[dpix] = c;
-                    dpix++;
-                }
-            }
-            else {              // must be INESCAPE
-                if (c == INPKT_END) {
-                    dppkt[dpix] = SLIP_END;
-                    dpix++;
-                    slstate = IN_PACKET;
-                }
-                else if (c == INPKT_ESC) {
-                    dppkt[dpix] = SLIP_ESC;
-                    dpix++;
-                    slstate = IN_PACKET;
-                }
-                else {          // Protocol violation.  Report it.
+                    // A protocol error.  Report it. Move remaining bytes down
                     dplog(M_BADSLIP, pEnum->port);
-                    slstate = AWAITING_PKT;
+                    (void) memmove(pEnum->slrx, &(pEnum->slrx[i + 1]), (pEnum->slix - i - 1));
+                    pEnum->slix = pEnum->slix - i - 1;
+                    slstate = IN_PACKET;
                     dpix = 0;
+                    i = 0;
                 }
             }
-        }
-        if ((bufend - bufstrt - 1) != 0) {
-            (void) memmove(pEnum->slrx, &(pEnum->slrx[bufstrt + 1]),
-                (bufend - bufstrt - 1));
-            pEnum->slix = bufend - bufstrt - 1;
-        }
-        else {
-            pEnum->slix = 0;
+            else if ((c == INPKT_END) && (slstate == INESCAPE)) {
+                dppkt[dpix] = SLIP_END;
+                dpix++;
+                slstate = IN_PACKET;
+            }
+            else if ((c == INPKT_ESC) && (slstate == INESCAPE)) {
+                dppkt[dpix] = SLIP_ESC;
+                dpix++;
+                slstate = IN_PACKET;
+            }
+            else {
+                // a normal character
+                dppkt[dpix] = c;
+                dpix++;
+            }
         }
         break;                  // Exit the while loop
     }

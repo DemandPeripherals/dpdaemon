@@ -59,6 +59,7 @@ all:
 	make -C qtr4 all
 	make -C qtr8 all
 	make -C serout all
+	make -C hostserial all
 
 clean:
 	make -C enumerator clean
@@ -100,6 +101,7 @@ clean:
 	make -C qtr4 clean
 	make -C qtr8 clean
 	make -C serout clean
+	make -C hostserial clean
 
 install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C enumerator install
@@ -141,6 +143,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial install
 	sudo ldconfig
 
 uninstall:
@@ -183,6 +186,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C qtr8 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C serout uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C hostserial uninstall
 	sudo ldconfig
 
 .PHONY : clean install uninstall
