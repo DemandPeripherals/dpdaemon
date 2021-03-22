@@ -31,7 +31,7 @@ width of zero sets that output high and pulse width of -1
 takes that pulse width out of the group move.
 Some examples may help:
    # Move all pulse widths to center
-   dpset servo4 servogroup 1500000, 1500000, 1500000, 1500000
+   dpset servo4 servogroup 1500000 1500000 1500000 1500000
    # Move servo2 counterclockwise
    dpset servo4 servo2 1000000
    # Move servos 1 and 3 but not servos 2 and 4
