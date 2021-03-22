@@ -27,6 +27,7 @@ all:
 	make -C adc812 all
 	make -C dc2 all
 	make -C quad2 all
+	make -C pulse2 all
 	make -C servo4 all
 	make -C roten all
 	make -C slide4 all
@@ -69,6 +70,7 @@ clean:
 	make -C adc812 clean
 	make -C dc2 clean
 	make -C quad2 clean
+	make -C pulse2 clean
 	make -C servo4 clean
 	make -C roten clean
 	make -C slide4 clean
@@ -111,6 +113,7 @@ install:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C adc812 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dc2 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C quad2 install
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C pulse2 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C servo4 install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C roten install
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C slide4 install
@@ -154,6 +157,7 @@ uninstall:
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C adc812 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C dc2 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C quad2 uninstall
+	make INST_LIB_DIR=$(INST_LIB_DIR) -C pulse2 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C servo4 uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C roten uninstall
 	make INST_LIB_DIR=$(INST_LIB_DIR) -C slide4 uninstall
