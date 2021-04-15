@@ -4,21 +4,14 @@
  *  Description: Driver for the SPI peripheral
  *
  *  Hardware Registers:
+
+BOB
+
  *    Addr=0    Clock select, chip select control, interrupt control and
  *              SPI mode register
- *    Addr=1    Max addr of packet data (== SPI pkt sz + 1)
- *    Addr=2    Data byte #1 in/out
- *    Addr=3    Data byte #2 in/out
- *    Addr=4    Data byte #3 in/out
- *        ::              ::
- *    Addr=14   Data byte #13 in/out
- *    Addr=15   Data byte #14 in/out
+ *    Addr=1    Data fifo.  First byte is packet size
  *
  *  NOTES:
- *   - The RAM addresses are numbered from zero and the first two locations
- *     are mirrors of the two config registers.  Thus the actual SPI packet
- *     data starts at addr=2 and goes up to (SPI_pkt_sz + 1).  This means
- *     that at most 14 bytes can be sent at one time.  
  *   - Extend the number of bytes in a packet by forcing CS low and sending
  *     several packets.  The electronics will see just one packet.
  *
@@ -65,7 +58,7 @@
 #define QCSPI_REG_MODE     0x00
 #define QCSPI_REG_COUNT    0x01
 #define QCSPI_REG_SPI      0x02
-#define QCSPI_NDATA_BYTE   16   // num data registers from QCSPI_REG_SPI
+#define QCSPI_NDATA_BYTE   64   // num data registers from QCSPI_REG_SPI
         // ESPI definitions
 #define CS_MODE_AL          0   // Active low chip select
 #define CS_MODE_AH          1   // Active high chip select
@@ -171,22 +164,28 @@ static void packet_hdlr(
     DP_PKT *pkt,       // the received packet
     int     len)       // number of bytes in the received packet
 {
-
     RSC    *prsc;
     QCSPIDEV *pCtx;
+    char    ob[MAX_LINE_LEN*3] = {0};  // chars back to user
+    int     ob_len = 0;                // index into ob[]
+    int     i;                         // index into packet data
 
     prsc = &(pslot->rsc[RSC_DATA]);
     pCtx = (QCSPIDEV *)(pslot->priv);
+
+    // Return if just the write reply
+    if ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA)
+        return;
 
     // Packets are either a write reply or an auto send SPI reply.
     // The auto-send packet should have a count two (for the 2 config bytes)
     // and the number of bytes in the SPI packet (nbxfer).
     if (!(( //autosend packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) == DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == (1 + pCtx->nbxfer)))
+            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 1 + pCtx->nbxfer))
           ||     ( // write response packet for config
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) ) {
@@ -195,19 +194,12 @@ static void packet_hdlr(
         return;
     }
 
-    // Return if just the write reply
-    if ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA)
-        return;
-
     // Send data to UI
-    char ob[MAX_LINE_LEN*3] = {0};
-    int ob_len = 0;
-    int i = 2; // skip the 2 config bytes
-    for(;i< 2+pCtx->nbxfer;i++) {
-        sprintf(&ob[(i - 2) * 3],"%02x ", pkt->data[i]);
+    for(i = 0; i< pCtx->nbxfer ; i++) {
+        sprintf(&ob[i * 3],"%02x ", pkt->data[i]);
     }
-    sprintf(&ob[(i - 2) * 3], "\n");
-    ob_len = ((i - 2) * 3) + 1;
+    sprintf(&ob[i * 3], "\n");
+    ob_len = (i * 3) + 1;
     send_ui(ob, ob_len, prsc->uilock);
     prompt(prsc->uilock);
 
@@ -398,7 +390,7 @@ static int send_spi(
     pmycore = pmyslot->pcore;
 
     // create a write packet to set the mode reg
-    pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
+    pkt.cmd = DP_CMD_OP_WRITE;
     pkt.core = pmycore->core_id;
 
     if (pCtx->nbxfer == 0) {
@@ -410,7 +402,7 @@ static int send_spi(
     else {
         pkt.reg = QCSPI_REG_COUNT;
         pkt.count = 1 + pCtx->nbxfer;  // sending count plus all SPI pkt bytes
-        pkt.data[0] = 1 + pCtx->nbxfer;  // max RAM address in the peripheral
+        pkt.data[0] = pCtx->nbxfer;  // max RAM address in the peripheral
 
         // Copy the SPI packet to the DP packet data
         for (i = 0; i < pCtx->nbxfer; i++)
