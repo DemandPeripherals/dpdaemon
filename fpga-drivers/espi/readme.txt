@@ -62,7 +62,7 @@ data:
     Due to the nature of SPI, dpget provides both read and write
 functionality. Each read requires a write first, and bytes must
 be provided to fill with resulting data.
-    The data must be a single line of up to 14 space-separated (or space) 
+    The data must be a single line of up to 32 space-separated (or space) 
 hexadecimal numbers, corresponding to one packet of data. 
     Returns the data read from the SPI peripheral. The data consists of
 a single line of space separated hexadecimal numbers which are
