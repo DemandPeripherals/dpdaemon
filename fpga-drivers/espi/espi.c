@@ -4,9 +4,6 @@
  *  Description: Driver for the SPI peripheral
  *
  *  Hardware Registers:
-
-BOB
-
  *    Addr=0    Clock select, chip select control, interrupt control and
  *              SPI mode register
  *    Addr=1    Data fifo.  First byte is packet size
@@ -20,7 +17,7 @@ BOB
  *    config    - SPI port configuration including clock speed, and CS config
  *
  *
- * Copyright:   Copyright (C) 2015-2019 Demand Peripherals, Inc.
+ * Copyright:   Copyright (C) 2015-2021 Demand Peripherals, Inc.
  *              All rights reserved.
  *
  * License:     This program is free software; you can redistribute it and/or

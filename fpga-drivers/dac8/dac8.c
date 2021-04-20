@@ -61,8 +61,7 @@
  **************************************************************/
         // register definitions
 #define QCSPI_REG_MODE     0x00
-#define QCSPI_REG_COUNT    0x01
-#define QCSPI_REG_SPI      0x02
+#define QCSPI_REG_FIFO     0x01
         // ESPI definitions
 #define CS_MODE_AL          0   // Active low chip select
 #define CS_MODE_AH          1   // Active high chip select
@@ -183,10 +182,10 @@ static void packet_hdlr(
     // (count = 3 = count plus two dac control bytes
     if (!(( //autosend packet (you'll get a autosend on all data writes)
            ((pkt->cmd & DP_CMD_AUTO_MASK) == DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 3)))) {
+            (pkt->reg == QCSPI_REG_FIFO) && (pkt->count == 3)))) {
         dplog("invalid dac8 packet from board to host");
         return;
     }
@@ -235,7 +234,6 @@ static void get_values(
     int     *plen,     // size of buf on input, #char in buf on output
     char    *buf)
 {
-    char     ibuf[MAX_LINE_LEN];
     int      didx;     // index of dac to set/get
     int      dval;     // the dac value
     int      outlen;
@@ -244,7 +242,8 @@ static void get_values(
     DAC8DEV *pctx = pslot->priv;
 
     if (cmd == DPSET) {
-        if ((sscanf(val, "%d %x\n", &didx, &dval) != 2)
+        if ((val == (char *) 0)
+           || (sscanf(val, "%d %x\n", &didx, &dval) != 2)
            || (didx < 1) || (didx > NDAC)
            || (dval < 0) || (dval > 0xff)) {
             *plen = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
@@ -265,13 +264,14 @@ static void get_values(
     }
     else {
         // write out the requested value
-        if ((sscanf(val, "%d\n", &didx) != 1)
-           || (didx < 1) || (didx > NDAC)) {
+        if ((val == (char *) 0)
+            || (sscanf(val, "%d\n", &didx) != 1)
+            || (didx < 1) || (didx > NDAC)) {
             *plen = snprintf(buf, *plen,  E_BDVAL, pslot->rsc[rscid].name);
             return;
         }
         didx--;                      // convert range 1--8 to 0--7
-        outlen = snprintf(ibuf, MAX_LINE_LEN, "%02x\n", pctx->dac[didx]);
+        outlen = snprintf(buf, *plen, "%02x\n", pctx->dac[didx]);
         *plen = outlen;
     }
 
@@ -295,12 +295,12 @@ static int send_spi(
     // create a write packet to set the mode reg
     pslot = pctx->pSlot;
     pmycore = pslot->pcore;
-    pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
+    pkt.cmd = DP_CMD_OP_WRITE;
     pkt.core = (pslot->pcore)->core_id;
 
-    pkt.reg = QCSPI_REG_COUNT;
+    pkt.reg = QCSPI_REG_FIFO;
     pkt.count = 1 + (2);           // sending count plus two dac bytes
-    pkt.data[0] = pkt.count;       // max RAM address in the peripheral
+    pkt.data[0] = 2;               // numb bytes in SPI packet
 
     // Load the config or dac values into the SPI packet.
     if (pctx->state == ST_CONFIG_1) {

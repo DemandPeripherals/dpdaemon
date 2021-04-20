@@ -60,9 +60,8 @@
  **************************************************************/
 // register definitions
 #define QCSPI_REG_MODE     0x00
-#define QCSPI_REG_COUNT    0x01
-#define QCSPI_REG_SPI      0x02
-#define QCSPI_NDATA_BYTE   16   // num data registers from QCSPI_REG_SPI
+#define QCSPI_REG_FIFO     0x01
+#define QCSPI_NDATA_BYTE   16   // max bytes in SPI packet
 
 // ESPI definitions
 #define CS_MODE_AL          0   // Active low chip select
@@ -113,11 +112,11 @@ enum TaskIds
 };
 
 // returned packet reply data offsets
-#define REPLY_DATA_BYTE0    2
-#define REPLY_DATA_BYTE1    3
-#define REPLY_DATA_BYTE2    4
-#define REPLY_DATA_BYTE3    5
-#define REPLY_DATA_BYTE4    6
+#define REPLY_DATA_BYTE0    0
+#define REPLY_DATA_BYTE1    1
+#define REPLY_DATA_BYTE2    2
+#define REPLY_DATA_BYTE3    3
+#define REPLY_DATA_BYTE4    4
 
 // UI aliases
 #define REG_INDEX cmdLineArgv[0]
@@ -387,10 +386,10 @@ static void packet_hdlr(
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == (1 + pctx->nbxfer)))
+            (pkt->reg == QCSPI_REG_FIFO)))
           ||     ( // write response packet for config
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) )
+            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))))
     {
         // unknown packet
         dplog("Invalid avr packet from board to host");
@@ -1261,7 +1260,7 @@ static int send_spi(
     pmycore = pmyslot->pcore;
 
     // create a write packet to set mode reg
-    pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
+    pkt.cmd = DP_CMD_OP_WRITE;
     pkt.core = pmycore->core_id;
 
     if (pctx->nbxfer == 0) {
@@ -1271,9 +1270,9 @@ static int send_spi(
         pkt.count = 1;
     }
     else {
-        pkt.reg = QCSPI_REG_COUNT;
+        pkt.reg = QCSPI_REG_FIFO;
         pkt.count = 1 + pctx->nbxfer;  // sending count plus all SPI pkt bytes
-        pkt.data[0] = 1 + pctx->nbxfer;  // max RAM address in peripheral
+        pkt.data[0] = pctx->nbxfer;    // num bytes in SPI packet
 
         // Copy SPI packet to DP packet data
         for (i = 0; i < pctx->nbxfer; i++) {

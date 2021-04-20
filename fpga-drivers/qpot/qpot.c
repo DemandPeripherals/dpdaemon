@@ -62,8 +62,7 @@
  **************************************************************/
         // register definitions
 #define QCSPI_REG_MODE     0x00
-#define QCSPI_REG_COUNT    0x01
-#define QCSPI_REG_SPI      0x02
+#define QCSPI_REG_FIFO     0x01
         // ESPI definitions
 #define CS_MODE_AL          0   // Active low chip select
 #define CS_MODE_AH          1   // Active high chip select
@@ -166,7 +165,7 @@ static void packet_hdlr(
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == 9)))) {
+            (pkt->reg == QCSPI_REG_FIFO) && (pkt->count == 9)))) {
         dplog("invalid qpot4 packet from board to host");
         return;
     }
@@ -283,9 +282,9 @@ static int send_spi(
     pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
     pkt.core = pmycore->core_id;
 
-    pkt.reg = QCSPI_REG_COUNT;
+    pkt.reg = QCSPI_REG_FIFO;
     pkt.count = 1 + (2 * 4);       // sending count plus all SPI pkt bytes
-    pkt.data[0] = pkt.count;       // max RAM address in the peripheral
+    pkt.data[0] = (2 * 4);         // num bytes in SPI packet
 
     // Load the pot values into the SPI packet.
     // 16 bits per pot: high four are the address (0-3 = pot#),

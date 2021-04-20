@@ -67,8 +67,7 @@
  **************************************************************/
         // register definitions
 #define QCSPI_REG_MODE     0x00
-#define QCSPI_REG_COUNT    0x01
-#define QCSPI_REG_SPI      0x02
+#define QCSPI_REG_FIFO     0x01
         // ESPI definitions
 #define CS_MODE_AL          0   // Active low chip select
 #define CS_MODE_AH          1   // Active high chip select
@@ -188,15 +187,19 @@ static void packet_hdlr(
     ob[MXLINELN-1] = (char) 0;
 
 
+    // Return if just the write reply
+    if ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA)
+        return;
+
     // Packets are either a write reply or an auto send SPI reply.
     // The auto-send packet should have a count two (for the 2 config bytes)
     // and the number of bytes in the SPI packet (nbxfer).
     if (!(( //autosend packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) == DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 16))
+            (pkt->reg == QCSPI_REG_MODE))
           ||    ( // write response packet for mosi data packet
            ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
-            (pkt->reg == QCSPI_REG_COUNT) && (pkt->count == pctx->nbxfer))
+            (pkt->reg == QCSPI_REG_FIFO) && (pkt->count == pctx->nbxfer))
           ||     ( // write response packet for config
            (((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA) &&
             (pkt->reg == QCSPI_REG_MODE) && (pkt->count == 1))) ) ) {
@@ -205,48 +208,44 @@ static void packet_hdlr(
         return;
     }
 
-    // Return if just the write reply
-    if ((pkt->cmd & DP_CMD_AUTO_MASK) != DP_CMD_AUTO_DATA)
-        return;
-
     // At this point we have a read response packet.  The packet
     // has registers 01 through 0B.  Extract and format the data
     // depending on which resource was requested.
     // Data in the chip is in BCD format.  We have to convert to binary
     if (pctx->getrsc == RSC_TIME) {
-        sec   = ((pkt->data[0x04] >> 4) & 0x07) * 10;
-        sec  += pkt->data[0x04] & 0x0f;
-        min   = ((pkt->data[0x05] >> 4) & 0x07) * 10;
-        min  += pkt->data[0x05] & 0x0f;
-        hour  = ((pkt->data[0x06] >> 4) & 0x07) * 10;
-        hour += pkt->data[0x06] & 0x0f;
-        day   = ((pkt->data[0x07] >> 4) & 0x03) * 10;
-        day  += pkt->data[0x07] & 0x0f;
-        mon   = ((pkt->data[0x09] >> 4) & 0x01) * 10;
-        mon  += pkt->data[0x09] & 0x0f;
-        year  = ((pkt->data[0x0a] >> 4) & 0x0f) * 10;
-        year += (pkt->data[0x0a] & 0x0f) + 2000;
+        sec   = ((pkt->data[0x02] >> 4) & 0x07) * 10;
+        sec  += pkt->data[0x02] & 0x0f;
+        min   = ((pkt->data[0x03] >> 4) & 0x07) * 10;
+        min  += pkt->data[0x03] & 0x0f;
+        hour  = ((pkt->data[0x04] >> 4) & 0x07) * 10;
+        hour += pkt->data[0x04] & 0x0f;
+        day   = ((pkt->data[0x05] >> 4) & 0x03) * 10;
+        day  += pkt->data[0x05] & 0x0f;
+        mon   = ((pkt->data[0x07] >> 4) & 0x01) * 10;
+        mon  += pkt->data[0x07] & 0x0f;
+        year  = ((pkt->data[0x08] >> 4) & 0x0f) * 10;
+        year += (pkt->data[0x08] & 0x0f) + 2000;
         ob_len = snprintf(ob, MXLINELN-1, "%4d-%02d-%02d %02d:%02d:%02d\n",
                      year, mon, day, hour, min, sec);
     }
     else if (pctx->getrsc == RSC_ALARM) {
-        amin   = ((pkt->data[0x0b] >> 4) & 0x07) * 10;
-        amin  += pkt->data[0x0b] & 0x0f;
-        ahour  = ((pkt->data[0x0c] >> 4) & 0x07) * 10;
-        ahour += pkt->data[0x0c] & 0x0f;
-        aday   = ((pkt->data[0x0d] >> 4) & 0x03) * 10;
-        aday  += pkt->data[0x0d] & 0x0f;
+        amin   = ((pkt->data[0x09] >> 4) & 0x07) * 10;
+        amin  += pkt->data[0x09] & 0x0f;
+        ahour  = ((pkt->data[0x0a] >> 4) & 0x07) * 10;
+        ahour += pkt->data[0x0a] & 0x0f;
+        aday   = ((pkt->data[0x0b] >> 4) & 0x03) * 10;
+        aday  += pkt->data[0x0b] & 0x0f;
         ob_len = snprintf(ob, MXLINELN-1, "%02d %02d:%02d\n",
                      aday, ahour, amin);
     }
     else if (pctx->getrsc == RSC_STATE) {
-        if (pkt->data[3] == 0x00)
+        if (pkt->data[1] == 0x00)
             ob_len = sprintf(ob, "off\n");
-        else if (pkt->data[3] == 0x02)
+        else if (pkt->data[1] == 0x02)
             ob_len = sprintf(ob, "enabled\n");
-        else if (pkt->data[3] == 0x0a)
+        else if (pkt->data[1] == 0x0a)
             ob_len = sprintf(ob, "alarm\n");
-        else if ((pkt->data[3] & 0x40) == 0x40)
+        else if ((pkt->data[1] & 0x40) == 0x40)
             ob_len = sprintf(ob, "on\n");
         else
             ob_len = sprintf(ob, "unknown\n");
@@ -319,14 +318,14 @@ static void user_hdlr(
         // Reading any resource causes a read from the device.
         // The packet handler sorts out what to return to the user.
         // Read registers 01 through 0B (11 regs) + 1 for the count
+        pkt.data[0] = 12;                     // 11 + cmd
         pkt.data[1] = PCF_CMD_READ | 0x01;    // read from reg 01
-        pkt.data[0] = 13;                     // 11 + cmd + count
 
         // tell the pkt handler which resource is being read,
         // lock the ui, and recort the number of bytes sent
         pctx->getrsc = rscid;
         pslot->rsc[rscid].uilock = (char) cn;
-        pctx->nbxfer = pkt.data[0];
+        pctx->nbxfer = pkt.data[0] + 1;       // add 1 for the count in data[0]
     }
     else if ((cmd == DPSET) && (rscid == RSC_TIME)) {
         // 2018-09-21 14:45:23
@@ -339,7 +338,7 @@ static void user_hdlr(
             return;
         }
         // write date/time into regs 02 to 08 + write_cmd + count
-        pkt.data[0] = 9;                      // count+cmd+regs
+        pkt.data[0] = 8;                      // cmd+regs
         pkt.data[1] = PCF_CMD_WRITE | 0x02;   // write from reg 02
         pkt.data[2] = (sec % 10) + ((sec / 10) << 4);
         pkt.data[3] = (min % 10) + ((min / 10) << 4);
@@ -357,7 +356,7 @@ static void user_hdlr(
             return;
         }
         // write day/hour/min for alarm, regs 09 to 0c
-        pkt.data[0] = 6;                      // count+cmd+regs
+        pkt.data[0] = 5;                      // cmd+regs
         pkt.data[1] = PCF_CMD_WRITE | 0x09;   // write from reg 09
         pkt.data[2] = (amin % 10) + ((amin / 10) << 4);
         pkt.data[3] = (ahour % 10) + ((ahour / 10) << 4);
@@ -380,7 +379,7 @@ static void user_hdlr(
             return;
         }
         // New state.  Send new state to card
-        pkt.data[0] = 3;                      // count+cmd+regs
+        pkt.data[0] = 2;                      // cmd+regs
         pkt.data[1] = PCF_CMD_WRITE | 0x01;   // write from reg 01
         pkt.data[2] = (newstate[0] == 'e') ? 0x02 :  // int on alarm
                       (newstate[1] == 'n') ? 0x40 :  // int on second change
@@ -390,10 +389,10 @@ static void user_hdlr(
 
     // to get here means we correctly parsed a UI command and
     // need to send out the SPI packet
-    pkt.cmd = DP_CMD_OP_WRITE | DP_CMD_AUTOINC;
+    pkt.cmd = DP_CMD_OP_WRITE;
     pkt.core = (pslot->pcore)->core_id;
-    pkt.reg = QCSPI_REG_COUNT;
-    pkt.count = pkt.data[0];       // sending count plus all SPI pkt bytes
+    pkt.reg = QCSPI_REG_FIFO;
+    pkt.count = 1+ pkt.data[0];       // sending count plus all SPI pkt bytes
     // try to send the packet.  Schedule a resend on tx failure
 
     txret = dpi_tx_pkt(pmycore, &pkt, 4 + pkt.count); // 4 header + data
