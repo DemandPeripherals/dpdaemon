@@ -465,18 +465,18 @@ void prompt(
         return;   // nothing to do or bogus request
     }
 
-    while (nwr != 1) {
+    while (1) {
         nwr = write(UiCons[cn].fd, prmpchar, 1);
+        if (nwr == 1) {
+            return;
+        }
         if ((nwr < 0) && (errno == EAGAIN)) {
             continue;      // recoverable error, try again
         }
-        else {
-            if (nwr < 0) {
-                dplog(M_BADCONN, errno);  // conn error.  Log it.
-            }
-            close_ui_conn(cn);  // close on EOF or error
-            return;
-        }
+        // non-recoverable error
+        dplog(M_BADCONN, errno);  // conn error.  Log it.
+        close_ui_conn(cn);  // close on EOF or error
+        return;
     }
     return;
 }
@@ -524,8 +524,9 @@ void receive_ui(int fd_in, int cb_data)
     else if ((nrd < 0) && (errno == EAGAIN)) {
         return;  // recoverable error.  Try again later
     } else {
-        if (nrd < 0)
+        if (nrd < 0) {
             dplog(M_BADCONN, errno);  // conn error.  Log it.
+        }
         close_ui_conn(cn);   // close conn on EOF or error
         return;
     }
